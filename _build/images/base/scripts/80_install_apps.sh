@@ -53,6 +53,7 @@ apt-get install -y \
 	nmap \
 	parallel \
 	qalculate-gtk \
+	ristretto \
 	sbt \
 	sudo \
 	tigervnc-common \
@@ -67,7 +68,14 @@ apt-get install -y \
 	xdg-utils \
 	xfce4 \
 	xfce4-terminal \
-	xterm
+	xterm \
+	zathura \
+	zathura-pdf-poppler
+
+# ristretto (images) and zathura (PDF) are the two viewers the image was missing:
+# without them `xdg-open` sent a PNG to firefox and a PDF to gv. Both are GTK3 and
+# poppler-glib is already in, so the pair costs ~2.6 MB. The defaults that route
+# to them live in skel/usr/share/applications/mimeapps.list of the final image.
 
 # need to switch Java-17 (for Chisel, as there is an incompatibility with java-21 and the scala version used by chisel)
 update-java-alternatives --set "$(update-java-alternatives --list | grep 1.17 | cut -d' ' -f1)"

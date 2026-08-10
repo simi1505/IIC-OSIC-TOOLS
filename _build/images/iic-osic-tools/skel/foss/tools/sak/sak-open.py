@@ -1,0 +1,466 @@
+#!/usr/bin/env python3
+# ========================================================================
+# File browser that opens every design file with its matching tool
+#
+# SPDX-FileCopyrightText: 2026 Harald Pretl
+# Johannes Kepler University, Department for Integrated Circuits
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Usage: sak-open.py [-h] [--all] [--prune <name>] [--refresh <s>] [--list]
+#                    [<root>]
+# ========================================================================
+
+"""One button per design file; click it and the right tool opens it.
+
+    sak-open.py [root] [options]
+
+Scans the tree for the extensions below and puts up a window with one button per
+file, labelled with the file name and grouped by directory. Pressing a button
+launches
+
+    .sch .sym                        xschem
+    .gds .gds.gz .oas .oas.gz        klayout -e        (edit mode)
+    .vcd .fst .gtkw                  gtkwave
+    .png .pdf                        xdg-open          (the desktop's handler)
+    everything textual               gvim              (RTL, SPICE decks, flow
+                                                       collateral, scripts, prose)
+
+in the file's own directory, so xschem finds its `simulations/` and klayout its
+run outputs where they belong. It needs a display, so run it in the VNC/noVNC
+desktop or over X11 forwarding, not in a shell-only container.
+
+Without an argument it scans `$DESIGNS`, falling back to the current directory
+when that is unset.
+
+The tree is rescanned every 15 s (`--refresh`), so a file a flow run or a save
+creates appears on its own; the window is only rebuilt when the list actually
+changed, and keeps its scroll position when it is.
+
+Build outputs are skipped by default -- a LibreLane `runs/` tree alone can hold
+ten times more GDS than the design does. `--all` walks everything, `--prune
+NAME` adds a directory name to the skip list.
+
+Each viewer command can be overridden from the environment, e.g.
+
+    SAK_OPEN_SV='code -w' sak-open.py
+
+The same file types are wired into the desktop's MIME database, so double
+clicking one in Thunar opens the same tool (see
+`skel/usr/share/mime/packages/iic-osic-tools-types.xml` and
+`skel/usr/share/applications/mimeapps.list` in the image sources).
+"""
+import argparse
+import os
+import shlex
+import subprocess
+import sys
+import tkinter as tk
+from pathlib import Path
+from tkinter import font as tkfont
+from tkinter import ttk
+
+# The design tree, which is what the container mounts and what a user means by
+# "my files". The current directory is the fallback, so the script is still
+# useful outside a started container.
+DEFAULT_ROOT = Path(os.environ.get("DESIGNS") or os.getcwd())
+
+# One entry per tool: the command (a token list, the file name is appended as
+# its last argument), the label colour its files get, and the extensions it
+# takes. Order decides the order of the checkboxes.
+TOOLS = (
+    (["xschem"], "#1a6b2f", (".sch", ".sym")),
+    (["klayout", "-e"], "#7a3d00", (".gds", ".gds.gz", ".oas", ".oas.gz")),
+    (["gtkwave"], "#6a1b7a", (".vcd", ".fst", ".gtkw")),
+    # No image or PDF viewer is installed, so hand these to the desktop's
+    # registered handler -- which means they open only under a real session
+    # (the noVNC/VNC desktop), not over a bare X forward.
+    (["xdg-open"], "#8a2a4a", (".png", ".pdf")),
+    # Everything textual, which is everything else: RTL, decks, flow collateral,
+    # scripts and prose all open in the same editor.
+    (
+        ["gvim"],
+        "#123a8a",
+        (
+            ".sv", ".v",
+            ".spice", ".cir", ".sp",
+            ".sdc", ".lef", ".lib", ".tcl", ".mk", ".yaml", ".json",
+            ".py", ".qmd", ".tex",
+            ".md",
+        ),
+    ),
+)
+
+# Flattened to per-extension viewer, colour and environment override. The
+# override for `.gds.gz` is SAK_OPEN_GDS_GZ.
+VIEWERS = {
+    ext: {
+        "cmd": list(cmd),
+        "env": "SAK_OPEN_" + ext[1:].replace(".", "_").upper(),
+        "color": color,
+    }
+    for cmd, color, exts in TOOLS
+    for ext in exts
+}
+
+# Directories that hold generated output rather than sources.
+PRUNE = {
+    ".git",
+    ".worktrees",
+    "__pycache__",
+    ".venv",
+    "node_modules",
+    "runs",  # LibreLane
+    "sim_build",  # cocotb
+    "obj_dir",  # Verilator
+    "simulations",  # xschem/ngspice scratch
+}
+
+
+def ext_of(path):
+    """The VIEWERS key `path` matches, or None.
+
+    Longest first, because the extensions are not all single-component:
+    `foo.gds.gz` has to land on `.gds.gz` and not on the `.gz` that
+    `Path.suffix` would hand back.
+    """
+    name = path.name.lower()
+    for ext in sorted(VIEWERS, key=len, reverse=True):
+        if name.endswith(ext) and len(name) > len(ext):
+            return ext
+    return None
+
+
+def viewer_cmd(ext):
+    """Command tokens for `ext`, honouring the environment override."""
+    spec = VIEWERS[ext]
+    override = os.environ.get(spec["env"])
+    return shlex.split(override) if override else list(spec["cmd"])
+
+
+def scan(root, prune, exts):
+    """Return the matching files below `root`, sorted by relative path."""
+    hits = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in prune and not d.startswith(".git"))
+        for name in filenames:
+            path = Path(dirpath) / name
+            if ext_of(path) in exts:
+                hits.append(path)
+    return sorted(hits, key=lambda p: (str(p.parent).lower(), p.name.lower()))
+
+
+class Launcher:
+    """The window: a filter row, a scrolling wall of buttons, a status line."""
+
+    COL_WIDTH = 240  # px of button grid per column
+    EXT_WIDTH = 78  # px per extension checkbox
+    MAX_COLUMNS = 6
+
+    def __init__(self, root_dir, prune, initial_exts, refresh=15.0):
+        self.root_dir = root_dir
+        self.prune = prune
+        self.refresh_ms = int(refresh * 1000)
+        self.refresh_job = None
+        self.files = []
+        self.found = {}  # extension -> how many the last scan turned up
+        self.procs = []
+
+        self.win = tk.Tk()
+        self.win.title(f"sak-open - {root_dir}")
+        self.win.geometry("1000x700")
+
+        self.filter_var = tk.StringVar()
+        self.filter_var.trace_add("write", lambda *_: self.populate())
+        self.ext_vars = {
+            ext: tk.BooleanVar(value=ext in initial_exts) for ext in VIEWERS
+        }
+        self.status_var = tk.StringVar(value="")
+        self.resting_status = ""  # what the status line returns to after a hover
+        self.grid_cols = 0  # button columns currently laid out; set by populate()
+
+        self._build_controls()
+        self._build_scroller()
+        self._build_status()
+
+        self.rescan()
+        if self.refresh_ms:
+            self.refresh_job = self.win.after(self.refresh_ms, self._auto_refresh)
+
+    # -- widgets ---------------------------------------------------------
+    def _build_controls(self):
+        # Two rows, because one does not survive a narrow window: the filter and
+        # the buttons stay put, the extension boxes below them reflow.
+        bar = ttk.Frame(self.win, padding=(8, 6, 8, 2))
+        bar.pack(fill="x")
+
+        ttk.Label(bar, text="Filter:").pack(side="left")
+        ttk.Button(bar, text="Rescan", command=self.rescan).pack(side="right")
+        ttk.Button(bar, text="None", width=5, command=lambda: self.set_all_exts(False)).pack(
+            side="right", padx=(2, 8)
+        )
+        ttk.Button(bar, text="All", width=4, command=lambda: self.set_all_exts(True)).pack(
+            side="right", padx=2
+        )
+        # width=8 so the entry can shrink; expand gives it the leftover space.
+        entry = ttk.Entry(bar, textvariable=self.filter_var, width=8)
+        entry.pack(side="left", fill="x", expand=True, padx=(4, 12))
+        entry.focus_set()
+        entry.bind("<Escape>", lambda _e: self.filter_var.set(""))
+
+        self.ext_box = ttk.Frame(self.win, padding=(8, 0, 8, 6))
+        self.ext_box.pack(fill="x")
+        self.ext_boxes = []
+        self.ext_cols = 0
+        self.ext_box.bind("<Configure>", lambda e: self._reflow_exts(e.width))
+
+    def _sync_ext_boxes(self, found):
+        """One checkbox per extension the tree actually holds, carrying its count.
+
+        VIEWERS knows 20-odd extensions and no single tree carries them all;
+        showing the empty ones would be three rows of dead boxes. The count
+        rides on the label because 20-odd of them do not fit in a status line.
+        """
+        for box in self.ext_boxes:
+            box.destroy()
+        self.ext_boxes = [
+            ttk.Checkbutton(
+                self.ext_box,
+                text=f"{ext} ({found[ext]})",
+                variable=self.ext_vars[ext],
+                command=self.populate,
+            )
+            for ext in VIEWERS
+            if found.get(ext)
+        ]
+        self.ext_cols = 0  # force the regrid below
+        self._reflow_exts(self.ext_box.winfo_width() or self.win.winfo_width())
+
+    def _reflow_exts(self, width):
+        """Re-grid the extension checkboxes into as many columns as `width` holds."""
+        if not self.ext_boxes:
+            return
+        cols = max(1, min(len(self.ext_boxes), int(width) // self.EXT_WIDTH))
+        if cols == self.ext_cols:
+            return  # a no-op regrid would retrigger <Configure> forever
+        self.ext_cols = cols
+        for col in range(self.ext_box.grid_size()[0]):
+            self.ext_box.columnconfigure(col, weight=0, uniform="")
+        for i, box in enumerate(self.ext_boxes):
+            box.grid(row=i // cols, column=i % cols, sticky="w", padx=2)
+        for col in range(cols):
+            self.ext_box.columnconfigure(col, weight=1, uniform="ext")
+
+    def set_all_exts(self, state):
+        for var in self.ext_vars.values():
+            var.set(state)
+        self.populate()
+
+    def _build_scroller(self):
+        outer = ttk.Frame(self.win)
+        outer.pack(fill="both", expand=True)
+
+        self.canvas = tk.Canvas(outer, highlightthickness=0)
+        vbar = ttk.Scrollbar(outer, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=vbar.set)
+        vbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        self.inner = ttk.Frame(self.canvas, padding=(8, 4))
+        self.window_id = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
+        self.inner.bind(
+            "<Configure>",
+            lambda _e: self.canvas.configure(scrollregion=self.canvas.bbox("all")),
+        )
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
+        # X11 sends wheel events as buttons 4/5, macOS/Windows as <MouseWheel>.
+        self.win.bind_all("<Button-4>", lambda _e: self.canvas.yview_scroll(-3, "units"))
+        self.win.bind_all("<Button-5>", lambda _e: self.canvas.yview_scroll(3, "units"))
+        self.win.bind_all(
+            "<MouseWheel>",
+            lambda e: self.canvas.yview_scroll(-1 * (e.delta // 120 or e.delta), "units"),
+        )
+
+    def _on_canvas_resize(self, event):
+        self.canvas.itemconfigure(self.window_id, width=event.width)
+        if self._columns() != self.grid_cols:  # only when it changes: a rebuild is not free
+            self.populate()
+
+    def _columns(self):
+        """How many button columns fit; one on a window too narrow for more."""
+        width = self.canvas.winfo_width() or int(self.win.winfo_width() or self.COL_WIDTH)
+        return max(1, min(self.MAX_COLUMNS, width // self.COL_WIDTH))
+
+    def _build_status(self):
+        ttk.Separator(self.win).pack(fill="x")
+        ttk.Label(
+            self.win, textvariable=self.status_var, padding=(8, 4), anchor="w"
+        ).pack(fill="x")
+
+    # -- data ------------------------------------------------------------
+    def rescan(self):
+        self._load(scan(self.root_dir, self.prune, set(VIEWERS)))
+        self.populate()
+
+    def _load(self, files):
+        self.files = files
+        found = {}
+        for path in files:
+            found[ext_of(path)] = found.get(ext_of(path), 0) + 1
+        self.found = found
+        self._sync_ext_boxes(found)
+
+    def _auto_refresh(self):
+        """Pick up files created or deleted outside the window.
+
+        A rebuild scrolls back to the top and drops the hover, so it happens
+        only when the file list really changed -- a flow run finishing, a new
+        schematic saved. An unchanged tree costs one os.walk and nothing else.
+        """
+        try:
+            files = scan(self.root_dir, self.prune, set(VIEWERS))
+            if files != self.files:
+                where = self.canvas.yview()[0]
+                self._load(files)
+                self.populate()
+                self.canvas.yview_moveto(where)
+        finally:
+            self.refresh_job = self.win.after(self.refresh_ms, self._auto_refresh)
+
+    def populate(self):
+        for child in self.inner.winfo_children():
+            child.destroy()
+
+        wanted = {ext for ext, var in self.ext_vars.items() if var.get()}
+        needle = self.filter_var.get().strip().lower()
+
+        groups = {}
+        for path in self.files:
+            if ext_of(path) not in wanted:
+                continue
+            rel = path.relative_to(self.root_dir)
+            if needle and needle not in str(rel).lower():
+                continue
+            groups.setdefault(rel.parent, []).append(path)
+
+        shown = 0
+        self.grid_cols = cols = self._columns()
+        heading = tkfont.nametofont("TkDefaultFont").copy()
+        heading.configure(weight="bold")
+        for rel_dir in sorted(groups, key=lambda p: str(p).lower()):
+            frame = ttk.LabelFrame(self.inner, text=str(rel_dir), padding=(6, 4))
+            frame.pack(fill="x", expand=True, pady=3)
+            for col in range(cols):
+                frame.columnconfigure(col, weight=1, uniform="files")
+            for i, path in enumerate(groups[rel_dir]):
+                button = tk.Button(
+                    frame,
+                    text=path.name,
+                    anchor="w",
+                    fg=VIEWERS[ext_of(path)]["color"],
+                    command=lambda p=path: self.open(p),
+                )
+                button.grid(row=i // cols, column=i % cols, sticky="ew", padx=2, pady=2)
+                # The label is the bare file name, so the status line carries the
+                # full path -- that is what tells two same-named files apart.
+                button.bind("<Enter>", lambda _e, p=path: self.status_var.set(str(p)))
+                button.bind("<Leave>", lambda _e: self.status_var.set(self.resting_status))
+                shown += 1
+
+        if not shown:
+            ttk.Label(
+                self.inner, text="(no files match)", padding=(4, 8), font=heading
+            ).pack(anchor="w")
+
+        total = sum(n for ext, n in self.found.items() if ext in wanted)
+        of_types = f"{len(wanted & set(self.found))} of {len(self.found)} types"
+        self.set_status(f"{shown} of {total} files shown, {of_types} selected")
+        self.canvas.yview_moveto(0.0)
+
+    # -- actions ---------------------------------------------------------
+    def set_status(self, text):
+        """Set the status line, and make it the text a hover reverts to."""
+        self.resting_status = text
+        self.status_var.set(text)
+
+    def open(self, path):
+        self.procs = [p for p in self.procs if p.poll() is None]  # reap
+        cmd = viewer_cmd(ext_of(path)) + [path.name]
+        try:
+            self.procs.append(
+                subprocess.Popen(cmd, cwd=path.parent, start_new_session=True)
+            )
+        except (OSError, ValueError) as exc:
+            self.set_status(f"cannot run {' '.join(cmd)}: {exc}")
+        else:
+            self.set_status(f"{' '.join(cmd)}   (in {path.parent.relative_to(self.root_dir)})")
+
+    def run(self):
+        self.win.mainloop()
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument(
+        "root",
+        nargs="?",
+        default=DEFAULT_ROOT,
+        type=Path,
+        help="directory to scan (default: $DESIGNS, else the current directory)",
+    )
+    ap.add_argument(
+        "--all",
+        action="store_true",
+        help="also scan build outputs (runs/, sim_build/, ...), skipped by default",
+    )
+    ap.add_argument(
+        "--prune",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="additional directory name to skip; repeatable",
+    )
+    ap.add_argument(
+        "--refresh",
+        type=float,
+        default=15.0,
+        metavar="SECONDS",
+        help="rescan interval, 0 to disable (default: 15)",
+    )
+    ap.add_argument(
+        "--list",
+        action="store_true",
+        help="print the files that would be shown and exit (no GUI)",
+    )
+    args = ap.parse_args(argv)
+
+    root = args.root.resolve()
+    if not root.is_dir():
+        sys.exit(f"not a directory: {root}")
+    prune = set() if args.all else PRUNE | set(args.prune)
+
+    if args.list:
+        for path in scan(root, prune, set(VIEWERS)):
+            print(path.relative_to(root))
+        return 0
+
+    try:
+        Launcher(root, prune, set(VIEWERS), refresh=max(0.0, args.refresh)).run()
+    except tk.TclError as exc:
+        sys.exit(f"cannot open a window ({exc}) -- run this in the VNC/X11 desktop")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=GTKWave
+Exec=gtkwave %f
+Type=Application
+MimeType=text/x-vcd;application/x-fst-waveform;text/x-gtkwave-save;
+Icon=gtkwave
+Categories=Development;Electronics;

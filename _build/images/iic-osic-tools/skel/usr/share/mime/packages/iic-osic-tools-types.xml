@@ -13,11 +13,14 @@
     <glob pattern="*.sch"/>
   </mime-type>
 
-  <!-- GDS II Files -->
+  <!-- GDS II Files.
+       The compressed globs carry a weight above the default 50 so they beat
+       freedesktop's own "*.gz" (application/gzip); otherwise a .gds.gz opens
+       in the archive manager instead of KLayout. -->
   <mime-type type="application/x-gds-layout">
     <comment>GDS II File</comment>
     <glob pattern="*.gds"/>
-    <glob pattern="*.gds.gz"/>
+    <glob pattern="*.gds.gz" weight="60"/>
     <glob pattern="*.gdsz"/>
   </mime-type>
 
@@ -25,16 +28,16 @@
   <mime-type type="application/x-magic-layout">
     <comment>Magic Layout File</comment>
     <glob pattern="*.mag"/>
-    <glob pattern="*.mag.gz"/>
+    <glob pattern="*.mag.gz" weight="60"/>
   </mime-type>
 
-  <!-- Magic Layout File -->
+  <!-- OASIS Layout File -->
   <mime-type type="application/x-oasis-layout">
     <comment>OASIS Layout File</comment>
     <glob pattern="*.oas"/>
-    <glob pattern="*.oas.gz"/>
+    <glob pattern="*.oas.gz" weight="60"/>
     <glob pattern="*.oasis"/>
-    <glob pattern="*.oasis.gz"/>
+    <glob pattern="*.oasis.gz" weight="60"/>
   </mime-type>
 
   <!-- Spice Netlist -->
@@ -43,6 +46,57 @@
     <glob pattern="*.spice"/>
     <glob pattern="*.spc"/>
     <glob pattern="*.cir"/>
+    <glob pattern="*.sp"/>
+    <sub-class-of type="text/plain"/>
+  </mime-type>
+
+  <!-- Value Change Dump, the simulator waveform format GTKWave reads -->
+  <mime-type type="text/x-vcd">
+    <comment>Value Change Dump Waveform</comment>
+    <glob pattern="*.vcd"/>
+    <sub-class-of type="text/plain"/>
+  </mime-type>
+
+  <!-- GTKWave's own binary dump and save file -->
+  <mime-type type="application/x-fst-waveform">
+    <comment>FST Waveform</comment>
+    <glob pattern="*.fst"/>
+  </mime-type>
+
+  <mime-type type="text/x-gtkwave-save">
+    <comment>GTKWave Save File</comment>
+    <glob pattern="*.gtkw"/>
+    <sub-class-of type="text/plain"/>
+  </mime-type>
+
+  <!-- Timing constraints. Without this an .sdc is guessed to be a StarOffice
+       Calc document from its extension alone and gets no handler at all. -->
+  <mime-type type="text/x-sdc">
+    <comment>Synopsys Design Constraints</comment>
+    <glob pattern="*.sdc" weight="60"/>
+    <sub-class-of type="text/plain"/>
+  </mime-type>
+
+  <!-- Liberty timing library. Same story as .sdc: the stock database reads
+       "*.lib" as a Microsoft PE executable. -->
+  <mime-type type="text/x-liberty">
+    <comment>Liberty Timing Library</comment>
+    <glob pattern="*.lib" weight="60"/>
+    <sub-class-of type="text/plain"/>
+  </mime-type>
+
+  <!-- Library Exchange Format, the abstract view LEF/DEF flows use -->
+  <mime-type type="text/x-lef">
+    <comment>Library Exchange Format</comment>
+    <glob pattern="*.lef"/>
+    <glob pattern="*.def"/>
+    <sub-class-of type="text/plain"/>
+  </mime-type>
+
+  <!-- Quarto source, the format the tool documentation is written in -->
+  <mime-type type="text/x-quarto">
+    <comment>Quarto Document</comment>
+    <glob pattern="*.qmd"/>
     <sub-class-of type="text/plain"/>
   </mime-type>
 </mime-info>

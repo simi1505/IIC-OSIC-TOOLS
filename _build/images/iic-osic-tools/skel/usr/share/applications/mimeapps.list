@@ -1,0 +1,65 @@
+# Default application per file type, for xdg-open, Thunar and sak-open.
+#
+# Without this file nothing states a preference, and xdg-open falls back to
+# whatever .desktop file happens to claim the type: a PNG went to firefox, a
+# PDF to gv, a .gds.gz to the archive manager, and the many types no installed
+# application claims (SystemVerilog, YAML, JSON, Python, Markdown, ...) had no
+# handler at all.
+#
+# This is the vendor-level file. A user's own choice, made in Thunar or with
+# `xdg-mime default`, lands in ~/.config/mimeapps.list and still wins over it.
+
+[Default Applications]
+
+# Schematic capture
+application/x-xschem-schematic=xschem.desktop
+application/x-xschem-symbol=xschem.desktop
+
+# Layout
+application/x-gds-layout=klayout.desktop
+application/x-oasis-layout=klayout.desktop
+application/x-magic-layout=magic.desktop
+
+# Waveforms
+text/x-vcd=gtkwave.desktop
+application/x-fst-waveform=gtkwave.desktop
+text/x-gtkwave-save=gtkwave.desktop
+
+# Documents and images
+application/pdf=org.pwmt.zathura.desktop
+image/png=org.xfce.ristretto.desktop
+image/jpeg=org.xfce.ristretto.desktop
+image/gif=org.xfce.ristretto.desktop
+image/tiff=org.xfce.ristretto.desktop
+image/bmp=org.xfce.ristretto.desktop
+image/svg+xml=org.xfce.ristretto.desktop
+
+# Everything textual goes to the editor. text/plain alone would not cover these:
+# most are types in their own right and are not subclassed to it, so they would
+# otherwise fall through to no handler.
+text/plain=gvim.desktop
+text/x-spice-netlist=gvim.desktop
+text/x-verilog=gvim.desktop
+text/x-svsrc=gvim.desktop
+text/x-vhdl=gvim.desktop
+text/x-sdc=gvim.desktop
+text/x-liberty=gvim.desktop
+text/x-lef=gvim.desktop
+text/x-quarto=gvim.desktop
+text/x-python=gvim.desktop
+text/x-python3=gvim.desktop
+text/x-tcl=gvim.desktop
+text/tcl=gvim.desktop
+text/x-makefile=gvim.desktop
+text/x-tex=gvim.desktop
+text/x-csrc=gvim.desktop
+text/x-chdr=gvim.desktop
+text/x-c++src=gvim.desktop
+text/markdown=gvim.desktop
+text/csv=gvim.desktop
+application/json=gvim.desktop
+application/yaml=gvim.desktop
+application/x-yaml=gvim.desktop
+application/xml=gvim.desktop
+text/xml=gvim.desktop
+application/x-shellscript=gvim.desktop

@@ -170,7 +170,10 @@ COPY --link --from=yosys                        ${TOOLS}/yosys                  
 # Copy tool version file
 COPY tool_metadata.yml /
 
-# Copy EDA skeleton into image
+# Copy EDA skeleton into image. It carries the MIME types and desktop entries
+# for the EDA formats, so both databases are rebuilt in the RUN below -- the
+# base image compiled them before this skeleton existed, which left the EDA
+# globs out of mime.cache entirely (a .sch resolved as text/plain).
 COPY images/iic-osic-tools/skel /
 
 # Install EDA packages from Python, NPM, and GEM; install examples; install KLayout add-ons
@@ -189,6 +192,9 @@ RUN bash /headless/scripts/install_eda.sh && \
     chmod -R 777 /headless/.local/share/veryl && \
     find /usr/share -type f -name "*.desktop" -exec chmod 644 {} \; && \
     find /usr/share -type f -name "iic*" -exec chmod 644 {} \; && \
+    chmod 644 /usr/share/applications/mimeapps.list && \
+    update-mime-database /usr/share/mime && \
+    update-desktop-database /usr/share/applications && \
     chmod -R 755 /foss/examples && \
     find /foss/examples -type f -not -name "*.sh" -exec chmod 644 {} \; && \
     chmod -R 755 /foss/tools/sak
