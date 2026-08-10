@@ -34,9 +34,11 @@ launches
     .gds .gds.gz .oas .oas.gz        klayout -e        (edit mode)
     .mag                             magic
     .vcd .fst .gtkw                  gtkwave
+    .raw                             gaw               (ngspice rawfile)
     .png .pdf                        xdg-open          (the desktop's handler)
     everything textual               gvim              (RTL, SPICE decks, flow
-                                                       collateral, scripts, prose)
+                                                       collateral, Makefiles,
+                                                       scripts, prose)
 
 in the file's own directory, so xschem finds its `simulations/` and klayout its
 run outputs where they belong. It needs a display, so run it in the VNC/noVNC
@@ -88,6 +90,7 @@ TOOLS = (
     # get lost. Unpack it yourself and open the result.
     (["magic"], "#b06000", (".mag",)),
     (["gtkwave"], "#6a1b7a", (".vcd", ".fst", ".gtkw")),
+    (["gaw"], "#1f6f8a", (".raw",)),
     # No image or PDF viewer is installed, so hand these to the desktop's
     # registered handler -- which means they open only under a real session
     # (the noVNC/VNC desktop), not over a bare X forward.
@@ -98,30 +101,33 @@ TOOLS = (
         ["gvim"],
         "#123a8a",
         (
-            ".sv", ".v", ".vhd", ".vhdl",
+            ".sv", ".svh", ".v", ".vh", ".vhd", ".vhdl",
             ".spice", ".cir", ".sp", ".cdl",
             ".sdc", ".lef", ".lib", ".tcl", ".mk", ".yaml", ".json",
             ".py", ".qmd", ".tex",
             ".md",
+            # A whole file name rather than a suffix, see ext_of().
+            "Makefile",
         ),
     ),
 )
 
-# Flattened to per-extension viewer, colour and environment override. The
-# override for `.gds.gz` is SAK_OPEN_GDS_GZ.
+# Flattened to per-key viewer, colour and environment override. The override
+# for `.gds.gz` is SAK_OPEN_GDS_GZ, the one for `Makefile` is SAK_OPEN_MAKEFILE.
 VIEWERS = {
-    ext: {
+    key: {
         "cmd": list(cmd),
-        "env": "SAK_OPEN_" + ext[1:].replace(".", "_").upper(),
+        "env": "SAK_OPEN_" + key.lstrip(".").replace(".", "_").upper(),
         "color": color,
     }
-    for cmd, color, exts in TOOLS
-    for ext in exts
+    for cmd, color, keys in TOOLS
+    for key in keys
 }
 
 # Directories that hold generated output rather than sources.
 PRUNE = {
     ".git",
+    ".svn",
     ".worktrees",
     "__pycache__",
     ".venv",
@@ -136,14 +142,19 @@ PRUNE = {
 def ext_of(path):
     """The VIEWERS key `path` matches, or None.
 
-    Longest first, because the extensions are not all single-component:
-    `foo.gds.gz` has to land on `.gds.gz` and not on the `.gz` that
-    `Path.suffix` would hand back.
+    A key beginning with a dot is a suffix, anything else is a whole file name
+    (`Makefile`, which carries no extension at all). Suffixes are tried longest
+    first, because they are not all single-component: `foo.gds.gz` has to land
+    on `.gds.gz` and not on the `.gz` that `Path.suffix` would hand back.
+    Matching is case-insensitive throughout, so `makefile` counts too.
     """
     name = path.name.lower()
-    for ext in sorted(VIEWERS, key=len, reverse=True):
-        if name.endswith(ext) and len(name) > len(ext):
-            return ext
+    for key in sorted(VIEWERS, key=len, reverse=True):
+        if key.startswith("."):
+            if name.endswith(key) and len(name) > len(key):
+                return key
+        elif name == key.lower():
+            return key
     return None
 
 

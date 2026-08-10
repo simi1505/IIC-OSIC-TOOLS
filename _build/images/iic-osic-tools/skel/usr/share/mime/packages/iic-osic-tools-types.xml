@@ -55,6 +55,14 @@
     <sub-class-of type="text/plain"/>
   </mime-type>
 
+  <!-- Spice rawfile, what ngspice writes and gaw plots.
+       The weight beats freedesktop's own "*.raw", which claims the extension
+       for Panasonic camera RAW; in this image a .raw is a simulation result. -->
+  <mime-type type="application/x-spice-raw">
+    <comment>Spice Raw Waveform</comment>
+    <glob pattern="*.raw" weight="60"/>
+  </mime-type>
+
   <!-- Value Change Dump, the simulator waveform format GTKWave reads -->
   <mime-type type="text/x-vcd">
     <comment>Value Change Dump Waveform</comment>

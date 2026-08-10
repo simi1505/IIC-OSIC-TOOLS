@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Gaw Analog Wave Viewer
+Comment=Plot ngspice rawfiles
+Exec=gaw %f
+Type=Application
+MimeType=application/x-spice-raw;
+Icon=/foss/tools/gaw3-xschem/share/pixmaps/gaw.png
+Terminal=false
+Categories=Development;Electronics;

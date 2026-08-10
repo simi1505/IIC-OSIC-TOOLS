@@ -36,39 +36,53 @@ set -euo pipefail
 
 SAK_OPEN="/foss/tools/sak/sak-open.py"
 
-# <extension> <expected .desktop file>
+# <probe file name> <expected .desktop file>
+# A row is a file name, not only an extension, so entries that carry no
+# extension at all (Makefile) can be expressed the same way.
 EXPECTED="
-sch     xschem.desktop
-sym     xschem.desktop
-gds     klayout.desktop
-gds.gz  klayout.desktop
-oas     klayout.desktop
-oas.gz  klayout.desktop
-mag     magic.desktop
-vcd     gtkwave.desktop
-fst     gtkwave.desktop
-gtkw    gtkwave.desktop
-png     org.xfce.ristretto.desktop
-pdf     org.pwmt.zathura.desktop
-sv      gvim.desktop
-v       gvim.desktop
-vhd     gvim.desktop
-vhdl    gvim.desktop
-spice   gvim.desktop
-cir     gvim.desktop
-sp      gvim.desktop
-cdl     gvim.desktop
-sdc     gvim.desktop
-lef     gvim.desktop
-lib     gvim.desktop
-tcl     gvim.desktop
-mk      gvim.desktop
-yaml    gvim.desktop
-json    gvim.desktop
-py      gvim.desktop
-qmd     gvim.desktop
-tex     gvim.desktop
-md      gvim.desktop
+probe.sch     xschem.desktop
+probe.sym     xschem.desktop
+probe.gds     klayout.desktop
+probe.gds.gz  klayout.desktop
+probe.oas     klayout.desktop
+probe.oas.gz  klayout.desktop
+probe.mag     magic.desktop
+probe.vcd     gtkwave.desktop
+probe.fst     gtkwave.desktop
+probe.gtkw    gtkwave.desktop
+probe.raw     gaw.desktop
+probe.png     org.xfce.ristretto.desktop
+probe.pdf     org.pwmt.zathura.desktop
+probe.sv      gvim.desktop
+probe.svh     gvim.desktop
+probe.v       gvim.desktop
+probe.vh      gvim.desktop
+probe.vhd     gvim.desktop
+probe.vhdl    gvim.desktop
+probe.spice   gvim.desktop
+probe.cir     gvim.desktop
+probe.sp      gvim.desktop
+probe.cdl     gvim.desktop
+probe.sdc     gvim.desktop
+probe.lef     gvim.desktop
+probe.lib     gvim.desktop
+probe.tcl     gvim.desktop
+probe.mk      gvim.desktop
+probe.yaml    gvim.desktop
+probe.json    gvim.desktop
+probe.py      gvim.desktop
+probe.qmd     gvim.desktop
+probe.tex     gvim.desktop
+probe.md      gvim.desktop
+probe.bib     gvim.desktop
+probe.log     gvim.desktop
+probe.toml    gvim.desktop
+probe.js      gvim.desktop
+probe.scala   gvim.desktop
+probe.sh      gvim.desktop
+probe.ps      gv.desktop
+probe.eps     gv.desktop
+Makefile      gvim.desktop
 "
 
 for cmd in xdg-mime python3; do
@@ -88,16 +102,15 @@ cd "$TMP" || { echo "[ERROR] Failed to change directory to $TMP."; exit 1; }
 FAILED=0
 
 # The probe files are empty, so nothing is decided by content sniffing: this
-# checks the extension routing, which is what a user's file name gives us.
-while read -r EXT WANT; do
-    [ -z "$EXT" ] && continue
-    PROBE="probe.$EXT"
+# checks the name routing, which is what a user's file name gives us.
+while read -r PROBE WANT; do
+    [ -z "$PROBE" ] && continue
     : > "$PROBE"
     TYPE=$(xdg-mime query filetype "$PROBE" 2>>"$LOG" | head -1)
     GOT=$(xdg-mime query default "$TYPE" 2>>"$LOG" | head -1)
-    printf "%-8s %-34s %s\n" ".$EXT" "${TYPE:-<none>}" "${GOT:-<none>}" >> "$LOG"
+    printf "%-14s %-34s %s\n" "$PROBE" "${TYPE:-<none>}" "${GOT:-<none>}" >> "$LOG"
     if [ "$GOT" != "$WANT" ]; then
-        echo "[ERROR] .$EXT resolves to <${TYPE:-none}> handled by <${GOT:-none}>, expected <$WANT>."
+        echo "[ERROR] $PROBE resolves to <${TYPE:-none}> handled by <${GOT:-none}>, expected <$WANT>."
         FAILED=1
     fi
 done <<< "$EXPECTED"
@@ -116,16 +129,18 @@ if [ ! -f "$SAK_OPEN" ]; then
     echo "[ERROR] <$SAK_OPEN> not found."
     exit 1
 fi
-SAK_EXTS=$(python3 -c "
+# Its VIEWERS keys are either a suffix (".sv") or a whole file name
+# ("Makefile"), which map onto the probe names of the table above.
+SAK_PROBES=$(python3 -c "
 import importlib.util
 spec = importlib.util.spec_from_file_location('sak_open', '$SAK_OPEN')
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
-print('\n'.join(sorted(e.lstrip('.') for e in mod.VIEWERS)))
+print('\n'.join(sorted('probe' + k if k.startswith('.') else k for k in mod.VIEWERS)))
 ")
-for EXT in $SAK_EXTS; do
-    if ! echo "$EXPECTED" | awk 'NF {print $1}' | grep -qx "$EXT"; then
-        echo "[ERROR] sak-open.py handles .$EXT, but this test has no expectation for it."
+for PROBE in $SAK_PROBES; do
+    if ! echo "$EXPECTED" | awk 'NF {print $1}' | grep -qx "$PROBE"; then
+        echo "[ERROR] sak-open.py handles <$PROBE>, but this test has no expectation for it."
         FAILED=1
     fi
 done
