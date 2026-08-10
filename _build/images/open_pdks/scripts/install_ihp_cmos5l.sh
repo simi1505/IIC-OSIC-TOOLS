@@ -202,6 +202,41 @@ OPENVAF_DIR=${TOOLS}/openvaf/bin PYTHONPATH=/tmp/${VACASK_NAME}/python \
     PDK_ROOT="$PDK_ROOT" PDK="$PDK" \
     python3 -m sg13cmos5ltovc --openvaf-options --target_cpu generic
 
+# ---------------------------------------------------------------------------
+# Add the diode and PNP corners to the "Add VACASK models symbol" menu entry.
+#
+# The corner list upstream ships covers MOSlv, MOShv, RES and CAP only, so a
+# design using a diode or the pnpMPA gets no corner section for it and has to
+# add the include by hand. CMOS5L converts both corner files, so list them.
+# Upstream omits cornerDIO for SG13G2 as well, i.e. this is a local addition
+# and not a fix -- keep it as a separate, clearly bounded edit.
+# ---------------------------------------------------------------------------
+echo "[INFO] Adding the diode and PNP corners to the xschem VACASK menu."
+python3 - "$PDK_ROOT" "$PDK" << 'PYEOF'
+import os
+import sys
+
+pdkroot, pdk = sys.argv[1], sys.argv[2]
+path = os.path.join(pdkroot, pdk, "libs.tech", "xschem", "xschem-vacask")
+
+with open(path) as f:
+    tcl = f.read()
+
+anchor = 'include \\"cornerCAP.lib\\" section=cap_typ\n'
+added = ('include \\"cornerDIO.lib\\" section=dio_tt\n'
+         'include \\"cornerPNP.lib\\" section=typ\n')
+
+if 'cornerDIO.lib' in tcl and 'cornerPNP.lib' in tcl:
+    print("[INFO] Diode and PNP corners already listed, nothing to do.")
+elif anchor not in tcl:
+    print("[WARN] cornerCAP.lib entry not found in %s, corner list left as is "
+          "(upstream changed the menu?)" % path)
+else:
+    with open(path, "w") as f:
+        f.write(tcl.replace(anchor, anchor + added, 1))
+    print("[INFO] Added cornerDIO.lib and cornerPNP.lib to the corner list.")
+PYEOF
+
 # Drop the backups the converter leaves behind: xschemrc.orig from its own
 # xschemrc patcher and *.sym.orig from xschem2vc's symbol patcher.
 find "$PDK_ROOT/$PDK/libs.tech/xschem" -name "*.orig" -delete
