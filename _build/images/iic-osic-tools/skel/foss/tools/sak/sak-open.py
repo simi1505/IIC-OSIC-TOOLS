@@ -236,6 +236,10 @@ class Launcher:
         VIEWERS knows 20-odd extensions and no single tree carries them all;
         showing the empty ones would be three rows of dead boxes. The count
         rides on the label because 20-odd of them do not fit in a status line.
+
+        Alphabetical, not in VIEWERS order: the boxes are something to find a
+        known extension in, and grouping them by tool only helps if you already
+        know which tool opens it.
         """
         for box in self.ext_boxes:
             box.destroy()
@@ -246,8 +250,7 @@ class Launcher:
                 variable=self.ext_vars[ext],
                 command=self.populate,
             )
-            for ext in VIEWERS
-            if found.get(ext)
+            for ext in sorted(ext for ext in VIEWERS if found.get(ext))
         ]
         self.ext_cols = 0  # force the regrid below
         self._reflow_exts(self.ext_box.winfo_width() or self.win.winfo_width())
