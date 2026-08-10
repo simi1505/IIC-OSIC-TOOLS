@@ -47,6 +47,10 @@ desktop or over X11 forwarding, not in a shell-only container.
 Without an argument it scans `$DESIGNS`, falling back to the current directory
 when that is unset.
 
+Hovering a button reports the file's size and age in the status line, plus a
+marker when it is a symlink or not writable. The right mouse button opens a
+menu: a terminal in the file's directory, or its path on the clipboard.
+
 The tree is rescanned every 15 s (`--refresh`), so a file a flow run or a save
 creates appears on its own; the window is only rebuilt when the list actually
 changed, and keeps its scroll position when it is.
@@ -69,6 +73,7 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import font as tkfont
@@ -124,6 +129,10 @@ VIEWERS = {
     for key in keys
 }
 
+# The terminal the right-click menu opens, and its override.
+TERMINAL = ["xfce4-terminal"]
+TERMINAL_ENV = "SAK_OPEN_TERMINAL"
+
 # Directories that hold generated output rather than sources.
 PRUNE = {
     ".git",
@@ -156,6 +165,38 @@ def ext_of(path):
         elif name == key.lower():
             return key
     return None
+
+
+def human_age(seconds):
+    """A rough "how long ago", which is what a flow run makes you ask."""
+    if seconds < 10:
+        return "just now"
+    for limit, div, unit in (
+        (90, 1, "s"),
+        (5400, 60, "min"),
+        (2 * 86400, 3600, "h"),
+        (14 * 86400, 86400, "days"),
+        (60 * 86400, 7 * 86400, "weeks"),
+        (2 * 365 * 86400, 30 * 86400, "months"),
+    ):
+        if seconds < limit:
+            return f"{round(seconds / div)} {unit} ago"
+    return f"{round(seconds / (365 * 86400))} years ago"
+
+
+def human_size(count):
+    """Byte count as something readable in a status line."""
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if count < 1024 or unit == "GiB":
+            return f"{count:.0f} {unit}" if unit == "B" else f"{count:.1f} {unit}"
+        count /= 1024.0
+    return f"{count:.1f} GiB"  # unreachable, keeps the return type obvious
+
+
+def terminal_cmd():
+    """The terminal emulator, overridable like the viewers."""
+    override = os.environ.get(TERMINAL_ENV)
+    return shlex.split(override) if override else list(TERMINAL)
 
 
 def viewer_cmd(ext):
@@ -209,6 +250,7 @@ class Launcher:
         self._build_controls()
         self._build_scroller()
         self._build_status()
+        self._build_menu()
 
         self.rescan()
         if self.refresh_ms:
@@ -327,6 +369,25 @@ class Launcher:
             self.win, textvariable=self.status_var, padding=(8, 4), anchor="w"
         ).pack(fill="x")
 
+    def _build_menu(self):
+        """The right-click menu. One instance, re-aimed at whatever was clicked."""
+        self.menu = tk.Menu(self.win, tearoff=0)
+        self.menu.add_command(label="Open shell", command=self.open_shell)
+        self.menu.add_separator()
+        self.menu.add_command(label="Copy path", command=self.copy_path)
+        self.menu.add_command(
+            label="Copy relative path", command=lambda: self.copy_path(relative=True)
+        )
+        self.menu_path = None
+
+    def popup_menu(self, event, path):
+        self.menu_path = path
+        self.status_var.set(self.describe(path))  # the click moved focus off the hover
+        try:
+            self.menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.menu.grab_release()
+
     # -- data ------------------------------------------------------------
     def rescan(self):
         self._load(scan(self.root_dir, self.prune, set(VIEWERS)))
@@ -391,10 +452,11 @@ class Launcher:
                     command=lambda p=path: self.open(p),
                 )
                 button.grid(row=i // cols, column=i % cols, sticky="ew", padx=2, pady=2)
-                # The label is the bare file name, so the status line carries the
-                # full path -- that is what tells two same-named files apart.
-                button.bind("<Enter>", lambda _e, p=path: self.status_var.set(str(p)))
+                # Hovering reports size, age and anything odd about the file;
+                # the right button opens a shell there or copies the path.
+                button.bind("<Enter>", lambda _e, p=path: self.status_var.set(self.describe(p)))
                 button.bind("<Leave>", lambda _e: self.status_var.set(self.resting_status))
+                button.bind("<Button-3>", lambda e, p=path: self.popup_menu(e, p))
                 shown += 1
 
         if not shown:
@@ -404,7 +466,11 @@ class Launcher:
 
         total = sum(n for ext, n in self.found.items() if ext in wanted)
         of_types = f"{len(wanted & set(self.found))} of {len(self.found)} types"
-        self.set_status(f"{shown} of {total} files shown, {of_types} selected")
+        # The root belongs here: with the paths gone from the hover line, this
+        # is the only place that says which tree is on screen.
+        self.set_status(
+            f"{shown} of {total} files shown, {of_types} selected   in {self.root_dir}"
+        )
         self.canvas.yview_moveto(0.0)
 
     # -- actions ---------------------------------------------------------
@@ -413,17 +479,73 @@ class Launcher:
         self.resting_status = text
         self.status_var.set(text)
 
+    def describe(self, path):
+        """How big the file is, when it last changed, and what is odd about it.
+
+        No path: the button carries the name, the group heading carries the
+        directory, and the menu copies the full thing. What is left is what
+        neither of those shows.
+        """
+        link = path.is_symlink()
+        try:
+            info = path.stat()  # follows the link: the size and date that matter
+        except OSError:
+            return "broken symlink" if link else "(gone)"
+        parts = [
+            human_size(info.st_size),
+            time.strftime("%Y-%m-%d %H:%M", time.localtime(info.st_mtime))
+            + f" ({human_age(max(0.0, time.time() - info.st_mtime))})",
+        ]
+        if link:
+            parts.append(f"symlink -> {os.readlink(path)}")
+        if not os.access(path, os.W_OK):
+            parts.append("read only")
+        return "   ".join(parts)
+
+    def copy_path(self, relative=False):
+        """Put the clicked file's path on the clipboard.
+
+        Relative to the scanned root for the form that goes into a Makefile or
+        a testbench, absolute for the one that goes into a shell.
+        """
+        if self.menu_path is None:
+            return
+        text = str(
+            self.menu_path.relative_to(self.root_dir) if relative else self.menu_path
+        )
+        self.win.clipboard_clear()
+        self.win.clipboard_append(text)
+        # X11 hands out the selection from the owning process, so this lives
+        # only as long as the window does unless a clipboard manager runs.
+        self.set_status(f"copied  {text}")
+
+    def open_shell(self):
+        """Terminal in the directory of the file the menu was opened on."""
+        if self.menu_path is None:
+            return
+        where = self.menu_path.parent
+        # --working-directory rather than cwd=: xfce4-terminal usually hands the
+        # request to an already running instance, and that one opens the window
+        # in its own working directory, not in ours.
+        self.launch(terminal_cmd() + [f"--working-directory={where}"], where, str(where))
+
     def open(self, path):
+        self.launch(
+            viewer_cmd(ext_of(path)) + [path.name],
+            path.parent,
+            f"in {path.parent.relative_to(self.root_dir)}",
+        )
+
+    def launch(self, cmd, cwd, note):
         self.procs = [p for p in self.procs if p.poll() is None]  # reap
-        cmd = viewer_cmd(ext_of(path)) + [path.name]
         try:
             self.procs.append(
-                subprocess.Popen(cmd, cwd=path.parent, start_new_session=True)
+                subprocess.Popen(cmd, cwd=cwd, start_new_session=True)
             )
         except (OSError, ValueError) as exc:
             self.set_status(f"cannot run {' '.join(cmd)}: {exc}")
         else:
-            self.set_status(f"{' '.join(cmd)}   (in {path.parent.relative_to(self.root_dir)})")
+            self.set_status(f"{' '.join(cmd)}   ({note})")
 
     def run(self):
         self.win.mainloop()
