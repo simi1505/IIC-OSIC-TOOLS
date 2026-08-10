@@ -98,7 +98,7 @@ TOOLS = (
         ["gvim"],
         "#123a8a",
         (
-            ".sv", ".v",
+            ".sv", ".v", ".vhd", ".vhdl",
             ".spice", ".cir", ".sp", ".cdl",
             ".sdc", ".lef", ".lib", ".tcl", ".mk", ".yaml", ".json",
             ".py", ".qmd", ".tex",

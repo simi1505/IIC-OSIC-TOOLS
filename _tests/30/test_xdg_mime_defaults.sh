@@ -52,6 +52,8 @@ png     org.xfce.ristretto.desktop
 pdf     org.pwmt.zathura.desktop
 sv      gvim.desktop
 v       gvim.desktop
+vhd     gvim.desktop
+vhdl    gvim.desktop
 spice   gvim.desktop
 cir     gvim.desktop
 sp      gvim.desktop
