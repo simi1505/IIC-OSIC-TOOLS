@@ -69,7 +69,7 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: dd163c89642d6686598f3f87d652edcff016dbc3
+  commit: 4ede5f5b17f1cf82c7f188cf9a51905fb68dc750
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
@@ -132,7 +132,7 @@
   commit: 0.12.3
 - name: vacask
   repo: https://codeberg.org/arpadbuermen/VACASK.git
-  commit: 23253711a714f3f9ed1653d3e7c57765c3a95c43
+  commit: b9ca96ed8882bbc64969463ba3245c037ff5060b
 - name: verilator
   repo: https://github.com/verilator/verilator.git
   commit: v5.050
