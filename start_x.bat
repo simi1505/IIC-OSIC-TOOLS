@@ -56,9 +56,16 @@ IF "%DOCKER_IMAGE%"=="" SET DOCKER_IMAGE=iic-osic-tools
 IF "%DOCKER_TAG%"=="" SET DOCKER_TAG=latest
 
 :: Fully qualify the image name (Podman does not resolve short names
-:: non-interactively).
+:: non-interactively); set DOCKER_REGISTRY=none to use unqualified names.
 IF "%DOCKER_REGISTRY%"=="" SET DOCKER_REGISTRY=docker.io
-SET IMAGE_NAME=%DOCKER_REGISTRY%/%DOCKER_USER%/%DOCKER_IMAGE%:%DOCKER_TAG%
+SET IMAGE_PREFIX=%DOCKER_REGISTRY%/
+IF /I "%DOCKER_REGISTRY%"=="none" SET IMAGE_PREFIX=
+:: A DOCKER_USER that contains "." or ":", or is "localhost", already names a
+:: registry (e.g. "myregistry:5000"), so the image name must not be prefixed.
+IF NOT "%DOCKER_USER%"=="%DOCKER_USER::=%" SET IMAGE_PREFIX=
+IF NOT "%DOCKER_USER%"=="%DOCKER_USER:.=%" SET IMAGE_PREFIX=
+IF /I "%DOCKER_USER%"=="localhost" SET IMAGE_PREFIX=
+SET IMAGE_NAME=%IMAGE_PREFIX%%DOCKER_USER%/%DOCKER_IMAGE%:%DOCKER_TAG%
 
 :: Docker Desktop and Podman machine expose the host WSLg directory at
 :: different locations inside their WSL2 VMs.
