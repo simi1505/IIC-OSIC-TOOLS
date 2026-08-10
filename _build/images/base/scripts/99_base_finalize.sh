@@ -36,15 +36,18 @@ update-desktop-database /usr/share/applications
 # Remove Ubuntu user in container to prevent conflicts with designer user
 userdel ubuntu
 
-# Trim XFCE session daemons that are useless inside a container: the udisks2
-# GVfs volume monitor (there is no udisks daemon/system D-Bus in the
-# container) and the tumbler thumbnailer. Removing the GVfs/D-Bus activation
-# files keeps Thunar & friends from spawning them.
+# Trim the udisks2 GVfs volume monitor, which really is useless inside a
+# container: there is no udisks daemon and no system D-Bus for it to talk to.
+#
+# Tumbler, the thumbnailer, is NOT trimmed with it. It was, and the result was
+# an error dialog ("The thumbnailer-service can not be reached ... Install
+# Tumbler") from Thunar and Ristretto every time a directory or an image was
+# opened -- the applications ask for the service whether or not its activation
+# file is there, and only the answer changes. Unlike the volume monitor,
+# tumbler needs nothing but the session bus and works here: it activates and
+# serves thumbnails in a VNC desktop and over X11 forwarding alike.
 rm -f /usr/share/gvfs/remote-volume-monitors/udisks2.monitor \
-      /usr/share/dbus-1/services/org.gtk.vfs.UDisks2VolumeMonitor.service \
-      /usr/share/dbus-1/services/org.xfce.Tumbler.Cache1.service \
-      /usr/share/dbus-1/services/org.xfce.Tumbler.Manager1.service \
-      /usr/share/dbus-1/services/org.xfce.Tumbler.Thumbnailer1.service
+      /usr/share/dbus-1/services/org.gtk.vfs.UDisks2VolumeMonitor.service
 
 # Remove Rust toolchains/caches that rustup auto-downloads when pip has to
 # build a package from source (no prebuilt wheel, e.g. on aarch64); a
