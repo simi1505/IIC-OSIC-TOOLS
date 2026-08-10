@@ -133,7 +133,12 @@ fi
 case "${DOCKER_USER}" in
 	*.* | *:* | localhost) IMAGE_PREFIX="" ;;
 esac
-IMAGE_NAME="${IMAGE_PREFIX}${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+# An empty DOCKER_USER means the image sits at the root of the registry.
+IMAGE_PATH="${DOCKER_IMAGE}"
+if [ -n "${DOCKER_USER}" ]; then
+	IMAGE_PATH="${DOCKER_USER}/${DOCKER_IMAGE}"
+fi
+IMAGE_NAME="${IMAGE_PREFIX}${IMAGE_PATH}:${DOCKER_TAG}"
 
 if [[ "$OSTYPE" == "linux"* ]]; then
 	[ -z "${IIC_OSIC_TOOLS_QUIET}" ] && echo "[INFO] Auto detected Linux."
