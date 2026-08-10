@@ -75,15 +75,25 @@ if [ -z ${DOCKER_TAG+z} ]; then
 fi
 
 # Fully qualify the image name (Podman does not resolve short names
-# non-interactively); set DOCKER_REGISTRY="" to use unqualified names.
+# non-interactively); set DOCKER_REGISTRY="" or "none" to use unqualified names.
 if [ -z ${DOCKER_REGISTRY+z} ]; then
 	DOCKER_REGISTRY="docker.io"
 fi
-if [ -n "${DOCKER_REGISTRY}" ]; then
-	IMAGE_NAME="${DOCKER_REGISTRY}/${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
-else
-	IMAGE_NAME="${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+IMAGE_PREFIX="${DOCKER_REGISTRY}/"
+if [ -z "${DOCKER_REGISTRY}" ] || [ "${DOCKER_REGISTRY}" = "none" ]; then
+	IMAGE_PREFIX=""
 fi
+# A DOCKER_USER that contains "." or ":", or is "localhost", already names a
+# registry (e.g. "myregistry:5000"), so the image name must not be prefixed.
+case "${DOCKER_USER}" in
+	*.* | *:* | localhost) IMAGE_PREFIX="" ;;
+esac
+# An empty DOCKER_USER means the image sits at the root of the registry.
+IMAGE_PATH="${DOCKER_IMAGE}"
+if [ -n "${DOCKER_USER}" ]; then
+	IMAGE_PATH="${DOCKER_USER}/${DOCKER_IMAGE}"
+fi
+IMAGE_NAME="${IMAGE_PREFIX}${IMAGE_PATH}:${DOCKER_TAG}"
 
 if [ -z ${CONTAINER_NAME+z} ]; then
 	CONTAINER_NAME="iic-osic-tools_jupyter_uid_"$(id -u)

@@ -311,8 +311,8 @@ Both scripts will use default settings, which you can tweak by settings shell va
 - `DESIGNS=$HOME/eda/designs` (`DESIGNS=%USERPROFILE%\eda\designs` for `.bat`) sets the directory that holds your design files. This directory is mounted into the container on `/foss/designs`.
 - `WEBSERVER_PORT=80` sets the port on which the Docker daemon will map the webserver port of the container to be reachable from localhost and the outside world. `0` disables the mapping. With rootless Podman (which cannot bind ports below 1024) the default is `8080`.
 - `VNC_PORT=5901` sets the port on which the Docker daemon will map the VNC server port of the container to be reachable from localhost and the outside world. This is only required to access the UI with a different VNC client. `0` disabled the mapping.
-- `DOCKER_REGISTRY="docker.io"` registry prefix used to fully qualify the image name (required for Podman, which does not resolve short names non-interactively). Set it to `""` to use unqualified names.
-- `DOCKER_USER="hpretl"` username for the Docker Hub repository from which the images are pulled. Usually, no change is required.
+- `DOCKER_REGISTRY="docker.io"` registry prefix used to fully qualify the image name (required for Podman, which does not resolve short names non-interactively). The prefix is skipped automatically when `DOCKER_USER` already names a registry (i.e. it contains a `.` or a `:`, or is `localhost`). Set it to `none` (the `.sh` scripts also accept `""`) to force unqualified names.
+- `DOCKER_USER="hpretl"` username for the Docker Hub repository from which the images are pulled. Usually, no change is required. To pull from a private registry, either set it to the registry (e.g. `DOCKER_USER="myregistry.example.com:5000"`, optionally followed by a namespace such as `ghcr.io/hpretl`), or put the registry in `DOCKER_REGISTRY` and leave `DOCKER_USER` empty, which means the image sits at the root of the registry. Emptying it works as `DOCKER_USER=""` for the `.sh` scripts; for the `.bat` scripts `cmd` treats an empty variable as unset, so the default has to be emptied in the script itself.
 - `DOCKER_IMAGE="iic-osic-tools"` Docker Hub image name to pull. Usually, no change is required.
 - `DOCKER_TAG="latest"` Docker Hub image tag. By default, it pulls the latest version; this might be handy to change if you want to match a specific version set.
 - `CONTAINER_USER=$(id -u)` (the current user's ID, `CONTAINER_USER=1000` for `.bat`) The user ID (and also group ID) is especially important on Linux and macOS because those are the IDs used to write files in the `DESIGNS` directory. For debugging/testing, the user and group ID can be set to `0` to gain root access inside the container.
@@ -350,8 +350,8 @@ The following environment variables are used for configuration:
 - `DRY_RUN` (unset by default), if set to any value (also `0`, `false`, etc.), makes the start scripts print all executed commands instead of running. Useful for debugging/testing or just creating "template commands" for unique setups.
 - `CONTAINER_ENGINE` (auto-detected) selects the container engine CLI. By default, `docker` is used if installed, otherwise `podman`. Set it explicitly (e.g. `CONTAINER_ENGINE=podman`) if both engines are installed and you want to override the default.
 - `DESIGNS=$HOME/eda/designs` (`DESIGNS=%USERPROFILE%\eda\designs` for `.bat`) sets the directory that holds your design files. This directory is mounted into the container on `/foss/designs`.
-- `DOCKER_REGISTRY="docker.io"` registry prefix used to fully qualify the image name (required for Podman, which does not resolve short names non-interactively). Set it to `""` to use unqualified names.
-- `DOCKER_USER="hpretl"` username for the Docker Hub repository from which the images are pulled. Usually, no change is required.
+- `DOCKER_REGISTRY="docker.io"` registry prefix used to fully qualify the image name (required for Podman, which does not resolve short names non-interactively). The prefix is skipped automatically when `DOCKER_USER` already names a registry (i.e. it contains a `.` or a `:`, or is `localhost`). Set it to `none` (the `.sh` scripts also accept `""`) to force unqualified names.
+- `DOCKER_USER="hpretl"` username for the Docker Hub repository from which the images are pulled. Usually, no change is required. To pull from a private registry, either set it to the registry (e.g. `DOCKER_USER="myregistry.example.com:5000"`, optionally followed by a namespace such as `ghcr.io/hpretl`), or put the registry in `DOCKER_REGISTRY` and leave `DOCKER_USER` empty, which means the image sits at the root of the registry. Emptying it works as `DOCKER_USER=""` for the `.sh` scripts; for the `.bat` scripts `cmd` treats an empty variable as unset, so the default has to be emptied in the script itself.
 - `DOCKER_IMAGE="iic-osic-tools"` Docker Hub image name to pull. Usually, no change is required.
 - `DOCKER_TAG="latest"` Docker Hub image tag. By default, it pulls the latest version; this might be handy to change if you want to match a specific Version set.
 - `CONTAINER_USER=$(id -u)` (the current user's ID, `CONTAINER_USER=1000` for `.bat`) The user ID (and also group ID) is especially important on Linux and macOS because those are the IDs used to write files in the `DESIGNS` directory.
@@ -396,14 +396,14 @@ It is strongly recommended enabling OpenGL:
 There are multiple ways to configure the start scripts using Bash. Two of them are shown here. First, the variables can be set directly for each run of the script; they are not saved in the active session:
 
 ```bash
-DESIGNS=/my/design/directory DOCKER_USERNAME=another_user ./start_x.sh
+DESIGNS=/my/design/directory DOCKER_USER=another_user ./start_x.sh
 ```
 
 The second variant is to set the variables in the current shell session (not persistent between shell restarts or shared between sessions):
 
 ```bash
 export DESIGNS=/my/design/directory
-export DOCKER_USERNAME=another_user
+export DOCKER_USER=another_user
 ./start_x.sh
 ```
 
@@ -415,7 +415,7 @@ In `CMD` you can't set the variables directly when running the script. So for th
 
 ```batch
 SET DESIGNS=\my\design\directory
-SET DOCKER_USERNAME=another_user
+SET DOCKER_USER=another_user
 .\start_x.bat
 ```
 
