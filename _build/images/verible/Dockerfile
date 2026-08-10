@@ -7,7 +7,7 @@
 ARG BASE_IMAGE_BUILD=registry.iic.jku.at:5000/iic-osic-tools:base-dev
 FROM ${BASE_IMAGE_BUILD} AS verible
 ARG VERIBLE_REPO_URL="https://github.com/chipsalliance/verible.git"
-ARG VERIBLE_REPO_COMMIT="v0.0-4131-g93141f42"
+ARG VERIBLE_REPO_COMMIT="v0.0-4135-g7807ee1a"
 ARG VERIBLE_NAME="verible"
 RUN --mount=type=bind,source=images/verible,target=/images/verible \
     bash /images/verible/scripts/install.sh

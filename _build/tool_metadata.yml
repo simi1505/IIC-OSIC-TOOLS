@@ -30,13 +30,13 @@
   commit: 037a1b97086ef8425bdd9379e38f6aada4f327e7
 - name: iverilog
   repo: https://github.com/steveicarus/iverilog.git
-  commit: f493076882c6b0ee33fb1ca67c7562f96c2242ca
+  commit: 008b76eae6faa59f72259bf4932995bf38e1e1c3
 - name: kactus2
   repo: https://github.com/kactus2/kactus2dev.git
   commit: v3.14.1
 - name: kepler-formal
   repo: https://github.com/keplertech/kepler-formal.git
-  commit: 21abcf8c8a093503eca96c4ef7d138ef26cc6aa6
+  commit: 5eced47bf5d4330b60dcaadc7babdfdc092b0c3b
 - name: klayout
   repo: https://github.com/KLayout/klayout.git
   commit: v0.30.10
@@ -51,7 +51,7 @@
   commit: 1.5.323
 - name: nextpnr
   repo: https://github.com/YosysHQ/nextpnr.git
-  commit: c73affb3dcef80576b13919437d466a1115bfb3b
+  commit: 62e659ed6748e9f60b2a4aa25dd4fe79a9605881
 - name: ngspice
   repo: https://github.com/danchitnis/ngspice-sf-mirror.git
   commit: ngspice-46
@@ -69,7 +69,7 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: bc86d3595161bcdfadbb620fd2798a2f54f59125
+  commit: dd163c89642d6686598f3f87d652edcff016dbc3
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
@@ -102,7 +102,7 @@
   commit: 9c61d29846d8521d9487a57739330f9682d5b542
 - name: slang
   repo: https://github.com/MikePopoloski/slang.git
-  commit: a3d50cfc2f6dd18eb26cc3ad5c8d996d9275b97d
+  commit: 43028607069b954beaf3f5afd5a73016957c0162
 - name: slang-yosys-plugin
   repo: https://github.com/povik/yosys-slang.git
   commit: e2829839afc62961d704123f30ed46e75477f33c
@@ -132,19 +132,19 @@
   commit: 0.12.3
 - name: vacask
   repo: https://codeberg.org/arpadbuermen/VACASK.git
-  commit: 1d4f3999e5ff2775a529d0ef0767b5805f8c3fae
+  commit: 23253711a714f3f9ed1653d3e7c57765c3a95c43
 - name: verilator
   repo: https://github.com/verilator/verilator.git
   commit: v5.050
 - name: verible
   repo: https://github.com/chipsalliance/verible.git
-  commit: v0.0-4131-g93141f42
+  commit: v0.0-4135-g7807ee1a
 - name: xcircuit
   repo: https://github.com/RTimothyEdwards/XCircuit.git
   commit: 9051f4804fe8f6386272085f604c9238e5ac0b05
 - name: xschem
   repo: https://github.com/StefanSchippers/xschem.git
-  commit: 210aea296d30ee6cd83c85fbebf104b806bdcba5
+  commit: 8b0fccea189f5a24e8a5cdb96cd955b00e7c4b6e
 - name: xyce
   repo: https://github.com/Xyce/Xyce.git
   commit: Release-7.10.0
