@@ -24,11 +24,15 @@
     <glob pattern="*.gdsz"/>
   </mime-type>
 
-  <!-- Magic Layout File -->
+  <!-- Magic Layout File.
+       "*.mag.gz" is deliberately NOT claimed here. Magic cannot read a gzipped
+       layout and does not report it: given cellx.mag.gz it strips the suffix,
+       finds no cellx.mag, and silently opens a new empty cell. Left to the
+       generic application/gzip, a double click offers to extract it instead,
+       which is the step that actually has to happen first. -->
   <mime-type type="application/x-magic-layout">
     <comment>Magic Layout File</comment>
     <glob pattern="*.mag"/>
-    <glob pattern="*.mag.gz" weight="60"/>
   </mime-type>
 
   <!-- OASIS Layout File -->
@@ -47,6 +51,7 @@
     <glob pattern="*.spc"/>
     <glob pattern="*.cir"/>
     <glob pattern="*.sp"/>
+    <glob pattern="*.cdl"/>
     <sub-class-of type="text/plain"/>
   </mime-type>
 

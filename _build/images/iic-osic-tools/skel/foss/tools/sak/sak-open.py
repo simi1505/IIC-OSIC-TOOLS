@@ -32,6 +32,7 @@ launches
 
     .sch .sym                        xschem
     .gds .gds.gz .oas .oas.gz        klayout -e        (edit mode)
+    .mag                             magic
     .vcd .fst .gtkw                  gtkwave
     .png .pdf                        xdg-open          (the desktop's handler)
     everything textual               gvim              (RTL, SPICE decks, flow
@@ -82,6 +83,10 @@ DEFAULT_ROOT = Path(os.environ.get("DESIGNS") or os.getcwd())
 TOOLS = (
     (["xschem"], "#1a6b2f", (".sch", ".sym")),
     (["klayout", "-e"], "#7a3d00", (".gds", ".gds.gz", ".oas", ".oas.gz")),
+    # .mag only: magic cannot read a gzipped layout, and unpacking one here
+    # would leave a .mag and a stale .mag.gz side by side, which is how edits
+    # get lost. Unpack it yourself and open the result.
+    (["magic"], "#b06000", (".mag",)),
     (["gtkwave"], "#6a1b7a", (".vcd", ".fst", ".gtkw")),
     # No image or PDF viewer is installed, so hand these to the desktop's
     # registered handler -- which means they open only under a real session
@@ -94,7 +99,7 @@ TOOLS = (
         "#123a8a",
         (
             ".sv", ".v",
-            ".spice", ".cir", ".sp",
+            ".spice", ".cir", ".sp", ".cdl",
             ".sdc", ".lef", ".lib", ".tcl", ".mk", ".yaml", ".json",
             ".py", ".qmd", ".tex",
             ".md",

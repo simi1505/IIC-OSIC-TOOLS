@@ -21,6 +21,9 @@
 #
 # The test also asserts that sak-open.py knows no file type this list does not
 # cover, so extending the one without the other fails here.
+#
+# .mag.gz is deliberately absent: magic cannot read a gzipped layout, so neither
+# the MIME package nor sak-open.py claims one.
 
 if [ -z "${RAND}" ]; then
     RAND=$(hexdump -e '/1 "%02x"' -n4 < /dev/urandom)
@@ -52,6 +55,7 @@ v       gvim.desktop
 spice   gvim.desktop
 cir     gvim.desktop
 sp      gvim.desktop
+cdl     gvim.desktop
 sdc     gvim.desktop
 lef     gvim.desktop
 lib     gvim.desktop
