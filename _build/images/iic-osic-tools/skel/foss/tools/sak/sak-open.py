@@ -48,17 +48,27 @@ Without an argument it scans `$DESIGNS`, falling back to the current directory
 when that is unset.
 
 Hovering a button reports the file's size and age in the status line, plus a
-marker when it is a symlink or not writable. The right mouse button opens a
-menu: a terminal in the file's directory, its path on the clipboard, or
+marker when it is a symlink or not writable. Clicking a directory heading folds
+it away. The right mouse button opens a menu:
 
-    Cell view   every view of one cell -- `gate.sch`, `gate.sym`, `gate.gds`,
-                `gate.nl.v` -- wherever in the tree they live, and whether or
-                not their type is ticked. Right-click any of them and untick
-                it to get the whole tree back.
+    Cell view       every view of one cell -- `gate.sch`, `gate.sym`,
+                    `gate.gds`, `gate.nl.v` -- wherever in the tree they live,
+                    and whether or not their type is ticked. Right-click any of
+                    them and untick it to get the whole tree back.
+    Scope here      rescan from the clicked file's directory, which is how a
+                    tree too big for `--max` becomes workable. "Back to full
+                    tree" returns to the root the program started with.
+    Save view       remember the folded directories and the ticked types for
+                    this tree in ~/.config/sak-open.json (XDG_CONFIG_HOME is
+                    honoured), and "Restore view" puts them back.
+    Open shell      a terminal in the file's directory.
+    Copy path       the path on the clipboard, absolute or root-relative.
 
 The tree is rescanned every 15 s (`--refresh`), so a file a flow run or a save
 creates appears on its own; the window is only rebuilt when the list actually
-changed, and keeps its scroll position when it is.
+changed, and keeps its scroll position when it is. Anything that appeared or
+was rewritten since the last scan is shown in bold for a minute, which makes a
+running flow visible as it lands.
 
 Build outputs are skipped by default -- a LibreLane `runs/` tree alone can hold
 ten times more GDS than the design does. `--all` walks everything, `--prune
@@ -79,6 +89,7 @@ clicking one in Thunar opens the same tool (see
 `skel/usr/share/applications/mimeapps.list` in the image sources).
 """
 import argparse
+import json
 import os
 import shlex
 import subprocess
@@ -143,6 +154,11 @@ VIEWERS = {
 TERMINAL = ["xfce4-terminal"]
 TERMINAL_ENV = "SAK_OPEN_TERMINAL"
 
+# Where "Save view" keeps the folded directories, per scanned tree.
+CONFIG = Path(
+    os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
+) / "sak-open.json"
+
 # Directories that hold generated output rather than sources.
 PRUNE = {
     ".git",
@@ -155,6 +171,7 @@ PRUNE = {
     "sim_build",  # cocotb
     "obj_dir",  # Verilator
     "simulations",  # xschem/ngspice scratch
+    "_freeze",  # Quarto's rendered-output cache
 }
 
 
@@ -227,6 +244,38 @@ def viewer_cmd(ext):
     return shlex.split(override) if override else list(spec["cmd"])
 
 
+def read_config():
+    """The saved views, or an empty one. A damaged file is not fatal here."""
+    try:
+        with open(CONFIG, encoding="utf-8") as handle:
+            saved = json.load(handle)
+    except FileNotFoundError:
+        return {}
+    return saved if isinstance(saved, dict) else {}
+
+
+def write_config(saved):
+    CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    # Write beside the target and rename, so an interrupted save cannot leave
+    # a half-written file where the next start expects JSON.
+    scratch = CONFIG.with_suffix(".tmp")
+    with open(scratch, "w", encoding="utf-8") as handle:
+        json.dump(saved, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    scratch.replace(CONFIG)
+
+
+def stamps_of(paths):
+    """Modification time per path, 0 for anything that just went away."""
+    stamps = {}
+    for path in paths:
+        try:
+            stamps[path] = path.stat().st_mtime
+        except OSError:
+            stamps[path] = 0.0
+    return stamps
+
+
 def scan(root, prune, exts):
     """Return the matching files below `root`, sorted by relative path."""
     hits = []
@@ -258,6 +307,9 @@ class Launcher:
     # with --max if your X server can take it, --max 0 to remove the limit.
     MAX_BUTTONS = 400
 
+    # How long a file that appeared or changed under us stays highlighted.
+    FRESH_SECONDS = 60
+
     def __init__(self, root_dir, prune, initial_exts, refresh=15.0, max_buttons=None):
         self.root_dir = root_dir
         self.prune = prune
@@ -281,6 +333,18 @@ class Launcher:
         self.resting_status = ""  # what the status line returns to after a hover
         self.grid_cols = 0  # button columns currently laid out; set by populate()
         self.cell = None  # cell whose views are on screen, None for the whole tree
+        self.full_root = root_dir  # what --root asked for; root_dir follows the scope
+        self.folded = set()  # directories collapsed to their heading
+        self.stamps = {}  # path -> mtime at the last scan, to spot what changed
+        self.fresh = {}  # path -> when it stops being highlighted
+        self.fresh_job = None
+
+        # Bold marks a directory heading and a file that just changed; plain is
+        # named rather than left to the default so the two are distinguishable
+        # from the outside (a widget with no font set reports the default one).
+        self.plain = tkfont.nametofont("TkDefaultFont").copy()
+        self.bold = tkfont.nametofont("TkDefaultFont").copy()
+        self.bold.configure(weight="bold")
 
         self._build_controls()
         self._build_scroller()
@@ -416,6 +480,12 @@ class Launcher:
         )
         self.menu.add_command(label="Open shell", command=self.open_shell)
         self.menu.add_separator()
+        self.menu.add_command(label="Scope here", command=self.scope_here)
+        self.menu.add_command(label="Back to full tree", command=self.unscope)
+        self.menu.add_separator()
+        self.menu.add_command(label="Save view", command=self.save_view)
+        self.menu.add_command(label="Restore view", command=self.restore_view)
+        self.menu.add_separator()
         self.menu.add_command(label="Copy path", command=self.copy_path)
         self.menu.add_command(
             label="Copy relative path", command=lambda: self.copy_path(relative=True)
@@ -425,6 +495,10 @@ class Launcher:
     def popup_menu(self, event, path):
         self.menu_path = path
         self.status_var.set(self.describe(path))  # the click moved focus off the hover
+        self.menu.entryconfigure(
+            "Back to full tree",
+            state="normal" if self.root_dir != self.full_root else "disabled",
+        )
         try:
             self.menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -435,13 +509,43 @@ class Launcher:
         self._load(scan(self.root_dir, self.prune, set(VIEWERS)))
         self.populate()
 
-    def _load(self, files):
+    def _load(self, files, stamps=None):
         self.files = files
+        stamps = stamps_of(files) if stamps is None else stamps
+        # Only from the second scan on: on the first one everything is "new",
+        # and a window that opens entirely in bold says nothing.
+        if self.stamps:
+            until = time.time() + self.FRESH_SECONDS
+            for path, mtime in stamps.items():
+                if self.stamps.get(path) != mtime:
+                    self.fresh[path] = until
+            self._schedule_expiry()
+        self.stamps = stamps
         found = {}
         for path in files:
             found[ext_of(path)] = found.get(ext_of(path), 0) + 1
         self.found = found
         self._sync_ext_boxes(found)
+
+    def is_fresh(self, path):
+        return self.fresh.get(path, 0) > time.time()
+
+    def _schedule_expiry(self):
+        """Redraw when the oldest highlight runs out, so bold does expire."""
+        if self.fresh_job is not None:
+            self.win.after_cancel(self.fresh_job)
+            self.fresh_job = None
+        if not self.fresh:
+            return
+        delay = max(0.0, min(self.fresh.values()) - time.time())
+        self.fresh_job = self.win.after(int(delay * 1000) + 200, self._expire)
+
+    def _expire(self):
+        self.fresh_job = None
+        now = time.time()
+        self.fresh = {p: t for p, t in self.fresh.items() if t > now}
+        self.populate()
+        self._schedule_expiry()
 
     def _auto_refresh(self):
         """Pick up files created or deleted outside the window.
@@ -452,9 +556,12 @@ class Launcher:
         """
         try:
             files = scan(self.root_dir, self.prune, set(VIEWERS))
-            if files != self.files:
+            stamps = stamps_of(files)
+            # Also on mtime, not just on the list: a file rewritten in place by
+            # a flow run has to light up too, and the list does not move.
+            if files != self.files or stamps != self.stamps:
                 where = self.canvas.yview()[0]
-                self._load(files)
+                self._load(files, stamps)
                 self.populate()
                 self.canvas.yview_moveto(where)
         finally:
@@ -481,17 +588,29 @@ class Launcher:
             groups.setdefault(rel.parent, []).append(path)
 
         matched = sum(len(v) for v in groups.values())
-        budget = matched if not self.max_buttons else min(matched, self.max_buttons)
+        hidden = sum(len(v) for d, v in groups.items() if d in self.folded)
+        openable = matched - hidden
+        budget = openable if not self.max_buttons else min(openable, self.max_buttons)
 
         shown = 0
         self.grid_cols = cols = self._columns()
-        heading = tkfont.nametofont("TkDefaultFont").copy()
-        heading.configure(weight="bold")
+        heading = self.bold
         for rel_dir in sorted(groups, key=lambda p: str(p).lower()):
-            if shown >= budget:
+            folded = rel_dir in self.folded
+            if shown >= budget and not folded:
                 break
-            frame = ttk.LabelFrame(self.inner, text=str(rel_dir), padding=(6, 4))
+            # The heading is a label of our own so it can be clicked; a folded
+            # group keeps it and drops the buttons, which is what makes folding
+            # cheap in X resources as well as in screen space.
+            mark = "▸" if folded else "▾"
+            label = ttk.Label(
+                self.inner, text=f"{mark} {rel_dir}  ({len(groups[rel_dir])})", font=heading
+            )
+            label.bind("<Button-1>", lambda _e, d=rel_dir: self.toggle_fold(d))
+            frame = ttk.LabelFrame(self.inner, labelwidget=label, padding=(6, 4))
             frame.pack(fill="x", expand=True, pady=3)
+            if folded:
+                continue
             for col in range(cols):
                 frame.columnconfigure(col, weight=1, uniform="files")
             for i, path in enumerate(groups[rel_dir][: budget - shown]):
@@ -500,6 +619,7 @@ class Launcher:
                     text=path.name,
                     anchor="w",
                     fg=VIEWERS[ext_of(path)]["color"],
+                    font=self.bold if self.is_fresh(path) else self.plain,
                     command=lambda p=path: self.open(p),
                 )
                 button.grid(row=i // cols, column=i % cols, sticky="ew", padx=2, pady=2)
@@ -514,10 +634,10 @@ class Launcher:
             ttk.Label(
                 self.inner, text="(no files match)", padding=(4, 8), font=heading
             ).pack(anchor="w")
-        elif shown < matched:
+        elif shown < openable:
             ttk.Label(
                 self.inner,
-                text=f"... {matched - shown} more not shown, narrow the filter "
+                text=f"... {openable - shown} more not shown, narrow the filter "
                 f"(or raise --max, currently {self.max_buttons})",
                 padding=(4, 8),
                 font=heading,
@@ -527,7 +647,11 @@ class Launcher:
         of_types = f"{len(wanted & set(self.found))} of {len(self.found)} types"
         # The root belongs here: with the paths gone from the hover line, this
         # is the only place that says which tree is on screen.
-        capped = f", {matched - shown} held back by --max" if shown < matched else ""
+        folded_note = (
+            f", {hidden} in {len(self.folded & set(groups))} folded" if hidden else ""
+        )
+        capped = f", {openable - shown} held back by --max" if shown < openable else ""
+        capped += folded_note
         if self.cell:
             self.set_status(
                 f"cell view: {self.cell}, {shown} view{'' if shown == 1 else 's'}"
@@ -598,6 +722,82 @@ class Launcher:
             self.cell_var.set(False)
         self._sync_controls()
         self.populate()
+
+    def scope_here(self):
+        """Rescan from the clicked file's directory instead of the whole tree."""
+        if self.menu_path is not None:
+            self._rescope(self.menu_path.parent)
+
+    def unscope(self):
+        self._rescope(self.full_root)
+
+    def _rescope(self, root):
+        if root == self.root_dir:
+            return
+        self.root_dir = root
+        self.win.title(f"sak-open - {root}")
+        # A different tree: no cell selected, nothing folded, and nothing is
+        # "new" yet -- the next scan is the baseline, not a wave of changes.
+        self.cell = None
+        self.cell_var.set(False)
+        self.folded.clear()
+        self.stamps = {}
+        self.fresh.clear()
+        self._sync_controls()
+        self.rescan()
+
+    def save_view(self):
+        """Persist the folded directories and the ticked types for this tree.
+
+        Keyed by the scanned root, so a scoped view and the full tree keep
+        their own, and two designs do not overwrite each other.
+        """
+        picked = sorted(ext for ext, var in self.ext_vars.items() if var.get())
+        try:
+            saved = read_config()
+            saved.setdefault("views", {})[str(self.root_dir)] = {
+                "folded": sorted(str(d) for d in self.folded),
+                "types": picked,
+            }
+            write_config(saved)
+        except (OSError, ValueError) as exc:
+            self.set_status(f"cannot write {CONFIG}: {exc}")
+        else:
+            self.set_status(
+                f"saved {len(self.folded)} folded directories and {len(picked)} types"
+                f" to {CONFIG}"
+            )
+
+    def restore_view(self):
+        try:
+            saved = read_config().get("views", {}).get(str(self.root_dir))
+        except (OSError, ValueError) as exc:
+            self.set_status(f"cannot read {CONFIG}: {exc}")
+            return
+        if not isinstance(saved, dict):
+            self.set_status(f"no saved view for {self.root_dir} in {CONFIG}")
+            return
+        self.folded = {Path(d) for d in saved.get("folded", [])}
+        picked = saved.get("types")
+        if picked is not None:
+            # Only what this build still knows; a type dropped from VIEWERS
+            # since the save must not resurrect a checkbox that cannot exist.
+            for ext, var in self.ext_vars.items():
+                var.set(ext in picked)
+        where = self.canvas.yview()[0]
+        self.populate()
+        self.canvas.yview_moveto(where)
+        self.set_status(
+            f"restored {len(self.folded)} folded directories"
+            f"{'' if picked is None else f' and {len(picked)} types'} from {CONFIG}"
+        )
+
+    def toggle_fold(self, rel_dir):
+        """Collapse a directory to its heading, or open it again."""
+        self.folded.symmetric_difference_update({rel_dir})
+        where = self.canvas.yview()[0]
+        self.populate()
+        self.canvas.yview_moveto(where)
 
     def _sync_controls(self):
         """Grey out what cell view ignores, so it reads as inert, not broken."""
