@@ -59,6 +59,11 @@ Build outputs are skipped by default -- a LibreLane `runs/` tree alone can hold
 ten times more GDS than the design does. `--all` walks everything, `--prune
 NAME` adds a directory name to the skip list.
 
+At most `--max` buttons (400) are drawn at once, because each one is an X
+window and an X server refuses to allocate a few hundred more. What is left
+out is stated at the end of the list and in the status line; narrowing the
+filter or unticking a few types brings it into view.
+
 Each viewer command can be overridden from the environment, e.g.
 
     SAK_OPEN_SV='code -w' sak-open.py
@@ -225,9 +230,22 @@ class Launcher:
     EXT_WIDTH = 78  # px per extension checkbox
     MAX_COLUMNS = 6
 
-    def __init__(self, root_dir, prune, initial_exts, refresh=15.0):
+    # Every file is a Tk button, and every Tk button is an X window with its own
+    # pixmaps. Past a few hundred the X server runs out and kills the process
+    # outright -- not an exception one can catch, but
+    #
+    #     X Error of failed request:  BadAlloc (insufficient resources ...)
+    #     Major opcode of failed request:  53 (X_CreatePixmap)
+    #
+    # on stderr and no window at all. A tree of 781 files reproduces it; 567
+    # does not. So stop well short of that and say what was left out. Raise it
+    # with --max if your X server can take it, --max 0 to remove the limit.
+    MAX_BUTTONS = 400
+
+    def __init__(self, root_dir, prune, initial_exts, refresh=15.0, max_buttons=None):
         self.root_dir = root_dir
         self.prune = prune
+        self.max_buttons = self.MAX_BUTTONS if max_buttons is None else max_buttons
         self.refresh_ms = int(refresh * 1000)
         self.refresh_job = None
         self.files = []
@@ -434,16 +452,21 @@ class Launcher:
                 continue
             groups.setdefault(rel.parent, []).append(path)
 
+        matched = sum(len(v) for v in groups.values())
+        budget = matched if not self.max_buttons else min(matched, self.max_buttons)
+
         shown = 0
         self.grid_cols = cols = self._columns()
         heading = tkfont.nametofont("TkDefaultFont").copy()
         heading.configure(weight="bold")
         for rel_dir in sorted(groups, key=lambda p: str(p).lower()):
+            if shown >= budget:
+                break
             frame = ttk.LabelFrame(self.inner, text=str(rel_dir), padding=(6, 4))
             frame.pack(fill="x", expand=True, pady=3)
             for col in range(cols):
                 frame.columnconfigure(col, weight=1, uniform="files")
-            for i, path in enumerate(groups[rel_dir]):
+            for i, path in enumerate(groups[rel_dir][: budget - shown]):
                 button = tk.Button(
                     frame,
                     text=path.name,
@@ -463,13 +486,23 @@ class Launcher:
             ttk.Label(
                 self.inner, text="(no files match)", padding=(4, 8), font=heading
             ).pack(anchor="w")
+        elif shown < matched:
+            ttk.Label(
+                self.inner,
+                text=f"... {matched - shown} more not shown, narrow the filter "
+                f"(or raise --max, currently {self.max_buttons})",
+                padding=(4, 8),
+                font=heading,
+            ).pack(anchor="w")
 
         total = sum(n for ext, n in self.found.items() if ext in wanted)
         of_types = f"{len(wanted & set(self.found))} of {len(self.found)} types"
         # The root belongs here: with the paths gone from the hover line, this
         # is the only place that says which tree is on screen.
+        capped = f", {matched - shown} held back by --max" if shown < matched else ""
         self.set_status(
-            f"{shown} of {total} files shown, {of_types} selected   in {self.root_dir}"
+            f"{shown} of {total} files shown, {of_types} selected{capped}"
+            f"   in {self.root_dir}"
         )
         self.canvas.yview_moveto(0.0)
 
@@ -573,6 +606,15 @@ def main(argv=None):
         help="additional directory name to skip; repeatable",
     )
     ap.add_argument(
+        "--max",
+        type=int,
+        default=Launcher.MAX_BUTTONS,
+        metavar="N",
+        dest="max_buttons",
+        help="most buttons to draw at once, 0 for no limit; past a few hundred "
+        f"the X server refuses to allocate more (default: {Launcher.MAX_BUTTONS})",
+    )
+    ap.add_argument(
         "--refresh",
         type=float,
         default=15.0,
@@ -597,7 +639,13 @@ def main(argv=None):
         return 0
 
     try:
-        Launcher(root, prune, set(VIEWERS), refresh=max(0.0, args.refresh)).run()
+        Launcher(
+            root,
+            prune,
+            set(VIEWERS),
+            refresh=max(0.0, args.refresh),
+            max_buttons=max(0, args.max_buttons),
+        ).run()
     except tk.TclError as exc:
         sys.exit(f"cannot open a window ({exc}) -- run this in the VNC/X11 desktop")
     return 0
