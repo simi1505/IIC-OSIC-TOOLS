@@ -396,14 +396,14 @@ It is strongly recommended enabling OpenGL:
 There are multiple ways to configure the start scripts using Bash. Two of them are shown here. First, the variables can be set directly for each run of the script; they are not saved in the active session:
 
 ```bash
-DESIGNS=/my/design/directory DOCKER_USERNAME=another_user ./start_x.sh
+DESIGNS=/my/design/directory DOCKER_USER=another_user ./start_x.sh
 ```
 
 The second variant is to set the variables in the current shell session (not persistent between shell restarts or shared between sessions):
 
 ```bash
 export DESIGNS=/my/design/directory
-export DOCKER_USERNAME=another_user
+export DOCKER_USER=another_user
 ./start_x.sh
 ```
 
@@ -415,7 +415,7 @@ In `CMD` you can't set the variables directly when running the script. So for th
 
 ```batch
 SET DESIGNS=\my\design\directory
-SET DOCKER_USERNAME=another_user
+SET DOCKER_USER=another_user
 .\start_x.bat
 ```
 

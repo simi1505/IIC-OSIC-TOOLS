@@ -43,6 +43,7 @@ This document summarizes the most important changes of the individual releases o
 * [Build] audited and resolved every `FIXME` in the build scripts and the ORFS test: the obsolete `GDS_ALLOW_EMPTY` export is dropped from the `ihp-sg13g2` ORFS test, the `rftoolkit` pins are confirmed against upstream `HEAD` and `LinAlgebra` is cloned blob-filtered, the `gobject-introspection` and `LibMan` patches document the exact condition for dropping them and now fail loudly when upstream moves, the `sky130A` KLayout tech-file repairs are guarded so the build reports when `open_pdks` no longer needs them, and the OpenMPI note is marked as a permanent container constraint rather than a defect.
 * [Build] extended the Python regression tests: `PySide6` is checked for a valid `__version__`, importable `chipify`/`snp2le` Qt entry points, and complete on-disk files against the installed wheel `RECORD` metadata; the CharLib test verifies the `PySpice` API actually used and that `charlib` on `PATH` is the wrapper script.
 * [Docs] normalized the project name to `IIC-OSIC-TOOLS` throughout the documentation and the install scripts.
+* [Docs] the "Overwriting Shell Variables" examples in `README.md` set `DOCKER_USERNAME`, which no script reads, so following them changed nothing. They set `DOCKER_USER` now.
 
 ## 2026.07
 
