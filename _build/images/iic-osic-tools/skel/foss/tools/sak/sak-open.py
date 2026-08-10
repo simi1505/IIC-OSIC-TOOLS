@@ -49,7 +49,12 @@ when that is unset.
 
 Hovering a button reports the file's size and age in the status line, plus a
 marker when it is a symlink or not writable. The right mouse button opens a
-menu: a terminal in the file's directory, or its path on the clipboard.
+menu: a terminal in the file's directory, its path on the clipboard, or
+
+    Cell view   every view of one cell -- `gate.sch`, `gate.sym`, `gate.gds`,
+                `gate.nl.v` -- wherever in the tree they live, and whether or
+                not their type is ticked. Right-click any of them and untick
+                it to get the whole tree back.
 
 The tree is rescanned every 15 s (`--refresh`), so a file a flow run or a save
 creates appears on its own; the window is only rebuilt when the list actually
@@ -172,6 +177,17 @@ def ext_of(path):
     return None
 
 
+def cell_name(path):
+    """The cell a file is a view of: its name up to the first dot.
+
+    A cell name carries no dot, everything after the first one qualifies the
+    view -- `ble_tx.gds`, `ble_tx.klayout.gds` and `ble_tx.nl.v` are three
+    views of `ble_tx`, and `dco.gds.gz` is one of `dco`. A name that starts
+    with a dot has no cell and stands for itself.
+    """
+    return path.name.split(".", 1)[0] or path.name
+
+
 def human_age(seconds):
     """A rough "how long ago", which is what a flow run makes you ask."""
     if seconds < 10:
@@ -264,6 +280,7 @@ class Launcher:
         self.status_var = tk.StringVar(value="")
         self.resting_status = ""  # what the status line returns to after a hover
         self.grid_cols = 0  # button columns currently laid out; set by populate()
+        self.cell = None  # cell whose views are on screen, None for the whole tree
 
         self._build_controls()
         self._build_scroller()
@@ -283,17 +300,19 @@ class Launcher:
 
         ttk.Label(bar, text="Filter:").pack(side="left")
         ttk.Button(bar, text="Rescan", command=self.rescan).pack(side="right")
-        ttk.Button(bar, text="None", width=5, command=lambda: self.set_all_exts(False)).pack(
-            side="right", padx=(2, 8)
+        self.none_btn = ttk.Button(
+            bar, text="None", width=5, command=lambda: self.set_all_exts(False)
         )
-        ttk.Button(bar, text="All", width=4, command=lambda: self.set_all_exts(True)).pack(
-            side="right", padx=2
+        self.none_btn.pack(side="right", padx=(2, 8))
+        self.all_btn = ttk.Button(
+            bar, text="All", width=4, command=lambda: self.set_all_exts(True)
         )
+        self.all_btn.pack(side="right", padx=2)
         # width=8 so the entry can shrink; expand gives it the leftover space.
-        entry = ttk.Entry(bar, textvariable=self.filter_var, width=8)
-        entry.pack(side="left", fill="x", expand=True, padx=(4, 12))
-        entry.focus_set()
-        entry.bind("<Escape>", lambda _e: self.filter_var.set(""))
+        self.entry = ttk.Entry(bar, textvariable=self.filter_var, width=8)
+        self.entry.pack(side="left", fill="x", expand=True, padx=(4, 12))
+        self.entry.focus_set()
+        self.entry.bind("<Escape>", lambda _e: self.filter_var.set(""))
 
         self.ext_box = ttk.Frame(self.win, padding=(8, 0, 8, 6))
         self.ext_box.pack(fill="x")
@@ -325,6 +344,7 @@ class Launcher:
         ]
         self.ext_cols = 0  # force the regrid below
         self._reflow_exts(self.ext_box.winfo_width() or self.win.winfo_width())
+        self._sync_controls()  # a rescan during cell view rebuilds these boxes
 
     def _reflow_exts(self, width):
         """Re-grid the extension checkboxes into as many columns as `width` holds."""
@@ -390,6 +410,10 @@ class Launcher:
     def _build_menu(self):
         """The right-click menu. One instance, re-aimed at whatever was clicked."""
         self.menu = tk.Menu(self.win, tearoff=0)
+        self.cell_var = tk.BooleanVar(value=False)
+        self.menu.add_checkbutton(
+            label="Cell view", variable=self.cell_var, command=self.toggle_cell
+        )
         self.menu.add_command(label="Open shell", command=self.open_shell)
         self.menu.add_separator()
         self.menu.add_command(label="Copy path", command=self.copy_path)
@@ -445,11 +469,15 @@ class Launcher:
 
         groups = {}
         for path in self.files:
-            if ext_of(path) not in wanted:
-                continue
+            if self.cell:
+                if cell_name(path) != self.cell:
+                    continue
+            else:
+                if ext_of(path) not in wanted:
+                    continue
+                if needle and needle not in str(path.relative_to(self.root_dir)).lower():
+                    continue
             rel = path.relative_to(self.root_dir)
-            if needle and needle not in str(rel).lower():
-                continue
             groups.setdefault(rel.parent, []).append(path)
 
         matched = sum(len(v) for v in groups.values())
@@ -500,10 +528,16 @@ class Launcher:
         # The root belongs here: with the paths gone from the hover line, this
         # is the only place that says which tree is on screen.
         capped = f", {matched - shown} held back by --max" if shown < matched else ""
-        self.set_status(
-            f"{shown} of {total} files shown, {of_types} selected{capped}"
-            f"   in {self.root_dir}"
-        )
+        if self.cell:
+            self.set_status(
+                f"cell view: {self.cell}, {shown} view{'' if shown == 1 else 's'}"
+                f"{capped}   (right-click a view to leave)   in {self.root_dir}"
+            )
+        else:
+            self.set_status(
+                f"{shown} of {total} files shown, {of_types} selected{capped}"
+                f"   in {self.root_dir}"
+            )
         self.canvas.yview_moveto(0.0)
 
     # -- actions ---------------------------------------------------------
@@ -551,6 +585,25 @@ class Launcher:
         # X11 hands out the selection from the owning process, so this lives
         # only as long as the window does unless a clipboard manager runs.
         self.set_status(f"copied  {text}")
+
+    def toggle_cell(self):
+        """Show every view of one cell, or go back to the whole tree.
+
+        The views of a cell live in different directories and under different
+        types -- schematic, symbol, layout, netlist -- so this deliberately
+        ignores both the filter box and the type checkboxes while it is on.
+        """
+        self.cell = cell_name(self.menu_path) if self.cell_var.get() else None
+        if self.cell_var.get() and self.menu_path is None:
+            self.cell_var.set(False)
+        self._sync_controls()
+        self.populate()
+
+    def _sync_controls(self):
+        """Grey out what cell view ignores, so it reads as inert, not broken."""
+        state = "disabled" if self.cell else "normal"
+        for widget in (self.entry, self.all_btn, self.none_btn, *self.ext_boxes):
+            widget.configure(state=state)
 
     def open_shell(self):
         """Terminal in the directory of the file the menu was opened on."""
