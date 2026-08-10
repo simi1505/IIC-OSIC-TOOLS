@@ -165,11 +165,13 @@ if [ ! -f "$PDK_ROOT/$PDK/libs.tech/ngspice/osdi/cap_cmomi.osdi" ]; then
 fi
 
 # Perform required preparation of IHP CMOS5L PDK for use with VACASK.
-# Upstream ships sg13cmos5ltovc.py since VACASK 2325371 (requested as
-# https://codeberg.org/arpadbuermen/VACASK/issues/94), which converts the
-# ngspice models, compiles cap_cmomi.va to OSDI, symlinks in the SG13G2 OSDI
-# objects, writes .vacaskrc.toml and patches the xschem symbols and xschemrc.
-# Only the three fixups applied below are still needed on top of it.
+# Upstream's sg13cmos5ltovc.py does all of it (requested as
+# https://codeberg.org/arpadbuermen/VACASK/issues/94): it converts the ngspice
+# models, compiles cap_cmomi.va to OSDI, symlinks in the SG13G2 OSDI objects,
+# writes .vacaskrc.toml and patches the xschem symbols and xschemrc.
+# Needs VACASK >= b9ca96e, which keeps the conversion of the models CMOS5L
+# symlinks from SG13G2 inside the CMOS5L tree and makes cap_cmomi's feed
+# default a literal, so it stays overridable (regression test 29).
 echo "[INFO] Preparing IHP CMOS5L PDK for VACASK."
 cd /tmp || exit 1
 rm -rf "${VACASK_NAME}"
@@ -196,219 +198,9 @@ else
 fi
 cd /tmp || exit 1
 
-# Snapshot the SG13G2 conversion before running the CMOS5L one -- see fixup 1.
-G2_MODELS="$PDK_ROOT/ihp-sg13g2/libs.tech/vacask/models"
-G2_SNAPSHOT="/tmp/sg13g2-vacask-models.snapshot"
-if [ ! -d "$G2_MODELS" ]; then
-	echo "[ERROR] SG13G2 VACASK models not found at $G2_MODELS."
-	exit 1
-fi
-rm -rf "$G2_SNAPSHOT"
-cp -a "$G2_MODELS" "$G2_SNAPSHOT"
-
 OPENVAF_DIR=${TOOLS}/openvaf/bin PYTHONPATH=/tmp/${VACASK_NAME}/python \
     PDK_ROOT="$PDK_ROOT" PDK="$PDK" \
     python3 -m sg13cmos5ltovc --openvaf-options --target_cpu generic
-
-# ---------------------------------------------------------------------------
-# Fixup 1: keep the CMOS5L conversion inside the CMOS5L tree.
-#
-# sg13cmos5ltovc.py writes each converted model to a path relative to the
-# *resolved* source file, and most CMOS5L ngspice models are symlinks into
-# ihp-sg13g2. Those files therefore land in the SG13G2 tree rather than in
-# CMOS5L's: some of them overwrite install_ihp.sh's output with CMOS5L's
-# sg13cmos5l_default_mod_* prefix (so an SG13G2 VACASK run using resistors or
-# svaricaphv then references a model its common include never declares), and
-# CMOS5L cannot reach any of them either, because the .vacaskrc.toml the
-# converter writes lists no ihp-sg13g2 include path. Move everything the run
-# added or changed into the CMOS5L tree, then restore SG13G2 as it was.
-# ---------------------------------------------------------------------------
-CMOS5L_MODELS="$PDK_ROOT/$PDK/libs.tech/vacask/models"
-mkdir -p "$CMOS5L_MODELS"
-RECLAIMED=0
-
-# First the ones the CMOS5L run added or rewrote -- those carry CMOS5L's
-# default-model prefix and must win over whatever SG13G2 has under that name.
-for f in "$G2_MODELS"/*; do
-	[ -f "$f" ] || continue
-	name="$(basename "$f")"
-	if [ ! -e "$G2_SNAPSHOT/$name" ] || ! cmp -s "$f" "$G2_SNAPSHOT/$name"; then
-		mv "$f" "$CMOS5L_MODELS/$name"
-		RECLAIMED=$((RECLAIMED + 1))
-	fi
-done
-
-# Then the ones whose conversion happened to come out byte-identical to
-# SG13G2's: they were written straight over the existing file, so the step
-# above cannot see them, yet CMOS5L still needs its own copy to resolve
-# includes like cornerMOSlv.lib. Every *.lib CMOS5L lists as an ngspice model
-# is expected in CMOS5L's VACASK model directory, symlinked source or not.
-for src in "$PDK_ROOT/$PDK/libs.tech/ngspice/models"/*.lib; do
-	[ -e "$src" ] || continue
-	name="$(basename "$src")"
-	if [ ! -e "$CMOS5L_MODELS/$name" ] && [ -f "$G2_MODELS/$name" ]; then
-		cp -a "$G2_MODELS/$name" "$CMOS5L_MODELS/$name"
-		RECLAIMED=$((RECLAIMED + 1))
-	fi
-done
-
-if [ "$RECLAIMED" -eq 0 ]; then
-	echo "[WARN] No converted models were written into the SG13G2 tree"
-	echo "[WARN] (already fixed upstream?)"
-else
-	echo "[INFO] Reclaimed $RECLAIMED converted model(s) from the SG13G2 tree into $PDK."
-fi
-
-# Put SG13G2 back exactly as install_ihp.sh left it.
-rm -rf "$G2_MODELS"
-cp -a "$G2_SNAPSHOT" "$G2_MODELS"
-rm -rf "$G2_SNAPSHOT"
-
-# ---------------------------------------------------------------------------
-# Fixup 2: turn symbolic subckt parameter defaults back into literals.
-# ---------------------------------------------------------------------------
-python3 - "$PDK_ROOT" "$PDK" << 'PYEOF'
-import os
-import re
-import sys
-
-pdkroot, pdk = sys.argv[1], sys.argv[2]
-
-PARAM_ASSIGN = re.compile(r'([A-Za-z_]\w*)\s*=\s*(\S+)')
-NUMBER = re.compile(r'[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?[a-zA-Z]*$')
-
-
-def literalize_subckt_defaults(path):
-    """Resolve symbolic subckt parameter defaults into plain literals.
-
-    VACASK treats a subckt parameter whose DEFAULT references another
-    parameter as derived, and then refuses to let an instance override it
-    ("Parameter 'feed' not found."). ngspice has no such rule, so the IHP
-    model files legitimately write cap_cmomi's feed default symbolically
-    (".param none=0 same=1 double=2" plus "feed=double") and
-    sg13cmos5ltovc.py carries that over verbatim -- it converts cap_cmomi.lib
-    at depth 0 and has no patch entry for it. The result silently locks feed
-    to 'double'
-    for every VACASK user, and breaks the xschem VACASK flow outright: the
-    spectre_format= line on cap_cmomi.sym always emits feed=<token>.
-
-    Substituting the file-level constants back in keeps the same defaults
-    while making the parameter a literal, hence overridable again. Written
-    against the shape the converter emits ("parameters <name>=<value>",
-    one or more per line, subckt bodies delimited by subckt/ends) rather
-    than against a device name, so a renamed or added device is covered too.
-    """
-    with open(path) as f:
-        lines = f.readlines()
-
-    # Pass 1: collect the file-level (outside any subckt) numeric constants.
-    consts = {}
-    depth = 0
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith('subckt'):
-            depth += 1
-        elif stripped.startswith('ends'):
-            depth = max(0, depth - 1)
-        elif depth == 0 and stripped.startswith('parameters'):
-            for name, value in PARAM_ASSIGN.findall(stripped[len('parameters'):]):
-                if NUMBER.match(value):
-                    consts[name] = value
-
-    if not consts:
-        return 0
-
-    # Pass 2: inside subckt bodies, replace a default that is exactly one of
-    # those constants. Anything more involved (a real expression) is left
-    # alone -- it is not something this fixup can safely rewrite.
-    substituted = 0
-    depth = 0
-    for idx, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith('subckt'):
-            depth += 1
-        elif stripped.startswith('ends'):
-            depth = max(0, depth - 1)
-        elif depth > 0 and stripped.startswith('parameters'):
-            head, tail = stripped[:len('parameters')], stripped[len('parameters'):]
-            for name, value in PARAM_ASSIGN.findall(tail):
-                if value in consts:
-                    tail = re.sub(r'\b%s\s*=\s*%s\b' % (re.escape(name), re.escape(value)),
-                                  '%s=%s' % (name, consts[value]), tail, count=1)
-                    substituted += 1
-                    print(f"[INFO]   {os.path.basename(path)}: subckt parameter "
-                          f"{name} default {value} -> {consts[value]}")
-            if tail != stripped[len('parameters'):]:
-                indent = line[:len(line) - len(line.lstrip())]
-                lines[idx] = indent + head + tail + '\n'
-
-    if substituted:
-        with open(path, 'w') as f:
-            f.writelines(lines)
-    return substituted
-
-models_dir = os.path.join(pdkroot, pdk, "libs.tech", "vacask", "models")
-
-if not os.path.isdir(models_dir):
-    print("[ERROR] No converted VACASK models found in " + models_dir)
-    sys.exit(1)
-
-substituted = 0
-for fname in sorted(os.listdir(models_dir)):
-    if fname.endswith(".lib"):
-        substituted += literalize_subckt_defaults(os.path.join(models_dir, fname))
-
-if substituted == 0:
-    print("[WARN] No symbolic subckt parameter defaults found in " + models_dir
-          + " (already fixed upstream?)")
-PYEOF
-
-# ---------------------------------------------------------------------------
-# Fixup 3: correct the xschem-vacask Tcl that sg13cmos5ltovc.py installs.
-#
-# The converter copies python/sg13g2xschem.tcl into xschem-vacask even though
-# it ships a CMOS5L variant (python/sg13cmos5lxschem.tcl) right beside it, so
-# the "Add VACASK models symbol" menu entry pulls in SG13G2's common include
-# instead of CMOS5L's. And neither variant is right about the corners: both
-# list cornerHBT.lib, which CMOS5L does not have (no HBT). Swap in the diode
-# and PNP corners it does have instead.
-# ---------------------------------------------------------------------------
-echo "[INFO] Fixing xschem VACASK menu entry for CMOS5L."
-python3 - "$PDK_ROOT" "$PDK" "/tmp/${VACASK_NAME}" << 'PYEOF'
-import os
-import sys
-
-pdkroot, pdk, vacask_dir = sys.argv[1], sys.argv[2], sys.argv[3]
-dest = os.path.join(pdkroot, pdk, "libs.tech", "xschem", "xschem-vacask")
-
-src = os.path.join(vacask_dir, "python", "sg13cmos5lxschem.tcl")
-if not os.path.isfile(src):
-    print("[WARN] sg13cmos5lxschem.tcl not found, falling back to the SG13G2 one")
-    src = os.path.join(vacask_dir, "python", "sg13g2xschem.tcl")
-
-with open(src) as f:
-    tcl = f.read()
-
-common_g2 = 'include \\"sg13g2_vacask_common.lib\\"'
-common_5l = 'include \\"sg13cmos5l_vacask_common.lib\\"'
-if common_g2 in tcl:
-    tcl = tcl.replace(common_g2, common_5l)
-    print("[INFO] xschem-vacask: common include -> sg13cmos5l_vacask_common.lib")
-elif common_5l not in tcl:
-    print("[WARN] xschem-vacask: no common include found (upstream changed?)")
-
-hbt = 'include \\"cornerHBT.lib\\" section=hbt_typ\n'
-corners = ('include \\"cornerDIO.lib\\" section=dio_tt\n'
-           'include \\"cornerPNP.lib\\" section=typ\n')
-if hbt in tcl:
-    tcl = tcl.replace(hbt, corners)
-    print("[INFO] xschem-vacask: cornerHBT -> cornerDIO + cornerPNP")
-elif corners not in tcl:
-    print("[WARN] xschem-vacask: corner list not patched (already fixed upstream?)")
-
-with open(dest, "w") as f:
-    f.write(tcl)
-PYEOF
 
 # Drop the backups the converter leaves behind: xschemrc.orig from its own
 # xschemrc patcher and *.sym.orig from xschem2vc's symbol patcher.
