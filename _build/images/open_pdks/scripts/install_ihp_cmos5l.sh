@@ -165,13 +165,11 @@ if [ ! -f "$PDK_ROOT/$PDK/libs.tech/ngspice/osdi/cap_cmomi.osdi" ]; then
 fi
 
 # Perform required preparation of IHP CMOS5L PDK for use with VACASK.
-# CMOS5L reuses SG13G2's converted models/OSDI (installed by install_ihp.sh)
-# for everything it symlinks; only the CMOS5L-own ngspice model files need
-# converting to VACASK format. Those are discovered at build time as the
-# regular files (as opposed to symlinks into ihp-sg13g2) in the ngspice model
-# directory -- do NOT hardcode the list, upstream renames devices (cap_mfringe
-# -> cap_mom -> cap_cmomi) and a stale list breaks the image build.
-# CMOS5L-own Verilog-A sources, if any, are compiled to OSDI for VACASK below.
+# Upstream ships sg13cmos5ltovc.py since VACASK 2325371 (requested as
+# https://codeberg.org/arpadbuermen/VACASK/issues/94), which converts the
+# ngspice models, compiles cap_cmomi.va to OSDI, symlinks in the SG13G2 OSDI
+# objects, writes .vacaskrc.toml and patches the xschem symbols and xschemrc.
+# Only the three fixups applied below are still needed on top of it.
 echo "[INFO] Preparing IHP CMOS5L PDK for VACASK."
 cd /tmp || exit 1
 rm -rf "${VACASK_NAME}"
@@ -198,12 +196,81 @@ else
 fi
 cd /tmp || exit 1
 
-PYTHONPATH="/tmp/${VACASK_NAME}/python" python3 - "$PDK_ROOT" "$PDK" << 'PYEOF'
+# Snapshot the SG13G2 conversion before running the CMOS5L one -- see fixup 1.
+G2_MODELS="$PDK_ROOT/ihp-sg13g2/libs.tech/vacask/models"
+G2_SNAPSHOT="/tmp/sg13g2-vacask-models.snapshot"
+if [ ! -d "$G2_MODELS" ]; then
+	echo "[ERROR] SG13G2 VACASK models not found at $G2_MODELS."
+	exit 1
+fi
+rm -rf "$G2_SNAPSHOT"
+cp -a "$G2_MODELS" "$G2_SNAPSHOT"
+
+OPENVAF_DIR=${TOOLS}/openvaf/bin PYTHONPATH=/tmp/${VACASK_NAME}/python \
+    PDK_ROOT="$PDK_ROOT" PDK="$PDK" \
+    python3 -m sg13cmos5ltovc --openvaf-options --target_cpu generic
+
+# ---------------------------------------------------------------------------
+# Fixup 1: keep the CMOS5L conversion inside the CMOS5L tree.
+#
+# sg13cmos5ltovc.py writes each converted model to a path relative to the
+# *resolved* source file, and most CMOS5L ngspice models are symlinks into
+# ihp-sg13g2. Those files therefore land in the SG13G2 tree rather than in
+# CMOS5L's: some of them overwrite install_ihp.sh's output with CMOS5L's
+# sg13cmos5l_default_mod_* prefix (so an SG13G2 VACASK run using resistors or
+# svaricaphv then references a model its common include never declares), and
+# CMOS5L cannot reach any of them either, because the .vacaskrc.toml the
+# converter writes lists no ihp-sg13g2 include path. Move everything the run
+# added or changed into the CMOS5L tree, then restore SG13G2 as it was.
+# ---------------------------------------------------------------------------
+CMOS5L_MODELS="$PDK_ROOT/$PDK/libs.tech/vacask/models"
+mkdir -p "$CMOS5L_MODELS"
+RECLAIMED=0
+
+# First the ones the CMOS5L run added or rewrote -- those carry CMOS5L's
+# default-model prefix and must win over whatever SG13G2 has under that name.
+for f in "$G2_MODELS"/*; do
+	[ -f "$f" ] || continue
+	name="$(basename "$f")"
+	if [ ! -e "$G2_SNAPSHOT/$name" ] || ! cmp -s "$f" "$G2_SNAPSHOT/$name"; then
+		mv "$f" "$CMOS5L_MODELS/$name"
+		RECLAIMED=$((RECLAIMED + 1))
+	fi
+done
+
+# Then the ones whose conversion happened to come out byte-identical to
+# SG13G2's: they were written straight over the existing file, so the step
+# above cannot see them, yet CMOS5L still needs its own copy to resolve
+# includes like cornerMOSlv.lib. Every *.lib CMOS5L lists as an ngspice model
+# is expected in CMOS5L's VACASK model directory, symlinked source or not.
+for src in "$PDK_ROOT/$PDK/libs.tech/ngspice/models"/*.lib; do
+	[ -e "$src" ] || continue
+	name="$(basename "$src")"
+	if [ ! -e "$CMOS5L_MODELS/$name" ] && [ -f "$G2_MODELS/$name" ]; then
+		cp -a "$G2_MODELS/$name" "$CMOS5L_MODELS/$name"
+		RECLAIMED=$((RECLAIMED + 1))
+	fi
+done
+
+if [ "$RECLAIMED" -eq 0 ]; then
+	echo "[WARN] No converted models were written into the SG13G2 tree"
+	echo "[WARN] (already fixed upstream?)"
+else
+	echo "[INFO] Reclaimed $RECLAIMED converted model(s) from the SG13G2 tree into $PDK."
+fi
+
+# Put SG13G2 back exactly as install_ihp.sh left it.
+rm -rf "$G2_MODELS"
+cp -a "$G2_SNAPSHOT" "$G2_MODELS"
+rm -rf "$G2_SNAPSHOT"
+
+# ---------------------------------------------------------------------------
+# Fixup 2: turn symbolic subckt parameter defaults back into literals.
+# ---------------------------------------------------------------------------
+python3 - "$PDK_ROOT" "$PDK" << 'PYEOF'
 import os
 import re
 import sys
-from ng2vclib.converter import Converter
-from ng2vclib import dfl
 
 pdkroot, pdk = sys.argv[1], sys.argv[2]
 
@@ -218,8 +285,10 @@ def literalize_subckt_defaults(path):
     parameter as derived, and then refuses to let an instance override it
     ("Parameter 'feed' not found."). ngspice has no such rule, so the IHP
     model files legitimately write cap_cmomi's feed default symbolically
-    (".param none=0 same=1 double=2" plus "feed=double") and the converter
-    carries that over verbatim. The result silently locks feed to 'double'
+    (".param none=0 same=1 double=2" plus "feed=double") and
+    sg13cmos5ltovc.py carries that over verbatim -- it converts cap_cmomi.lib
+    at depth 0 and has no patch entry for it. The result silently locks feed
+    to 'double'
     for every VACASK user, and breaks the xschem VACASK flow outright: the
     spectre_format= line on cap_cmomi.sym always emits feed=<token>.
 
@@ -278,185 +347,75 @@ def literalize_subckt_defaults(path):
             f.writelines(lines)
     return substituted
 
-tech_src = os.path.join(pdkroot, pdk, "libs.tech", "ngspice", "models")
-sg13g2_tech_src = os.path.join(pdkroot, "ihp-sg13g2", "libs.tech", "ngspice", "models")
-dest_dir = os.path.join(pdkroot, pdk, "libs.tech", "vacask", "models")
+models_dir = os.path.join(pdkroot, pdk, "libs.tech", "vacask", "models")
 
-# CMOS5L-own ngspice model files: every regular *.lib in the model directory.
-# The rest are symlinks into ihp-sg13g2 and were already converted by
-# sg13g2tovc.py during install_ihp.sh. Discovering them keeps this working
-# across upstream device renames instead of failing the build on a stale name.
-own_files = sorted(
-    e.name for e in os.scandir(tech_src)
-    if e.name.endswith(".lib") and not e.is_symlink() and e.is_file()
-)
-
-if not own_files:
-    print("[ERROR] No CMOS5L-own ngspice model files found in " + tech_src)
+if not os.path.isdir(models_dir):
+    print("[ERROR] No converted VACASK models found in " + models_dir)
     sys.exit(1)
 
-os.makedirs(dest_dir, exist_ok=True)
+substituted = 0
+for fname in sorted(os.listdir(models_dir)):
+    if fname.endswith(".lib"):
+        substituted += literalize_subckt_defaults(os.path.join(models_dir, fname))
 
-for fname in own_files:
-    # corner*.lib only wire up .include chains -- convert them like
-    # sg13g2tovc.py does, i.e. keep the includes instead of inlining them
-    corner = fname.startswith("corner")
-
-    cfg = dfl.default_config()
-    cfg["sourcepath"] = [tech_src, sg13g2_tech_src]
-    cfg["read_depth"] = 0 if corner else 1
-    cfg["process_depth"] = 0 if corner else 1
-    cfg["output_depth"] = 0 if corner else None
-    cfg["default_model_prefix"] = "sg13cmos5l_default_mod_"
-    cfg["signature"] = "// Converted from IHP SG13CMOS5L PDK for Ngspice\n"
-
-    src = os.path.join(tech_src, fname)
-    dst = os.path.join(dest_dir, fname)
-    print(f"Converting {src} -> {dst}")
-    Converter(cfg).convert(src, dst)
-    literalize_subckt_defaults(dst)
+if substituted == 0:
+    print("[WARN] No symbolic subckt parameter defaults found in " + models_dir
+          + " (already fixed upstream?)")
 PYEOF
 
-# Compile the CMOS5L-own Verilog-A models to OSDI for VACASK. The .osdi objects
-# shipped in libs.tech/ngspice/osdi are built for ngspice with stock OpenVAF and
-# are not reused here, exactly as install_ihp.sh rebuilds the SG13G2 ones with
-# openvaf-r. No -D__NGSPICE__: the CMOS5L sources only branch on __XYCE__, and
-# the default branch is the $mfactor one that VACASK expects.
-OPENVAF_BIN="${TOOLS}/openvaf/bin/openvaf-r"
-VA_SRC_DIR="$PDK_ROOT/$PDK/libs.tech/verilog-a"
-VACASK_OSDI_DIR="$PDK_ROOT/$PDK/libs.tech/vacask/osdi"
-VACASK_COMMON="$PDK_ROOT/$PDK/libs.tech/vacask/models/sg13cmos5l_vacask_common.lib"
-
-# Common include: pulls in the SG13G2 loads/default models (most CMOS5L devices
-# are symlinks into SG13G2) and adds the CMOS5L-own OSDI loads on top.
-echo '// Converted from IHP SG13CMOS5L PDK for Ngspice' >  "$VACASK_COMMON"
-echo 'include "sg13g2_vacask_common.lib"'               >> "$VACASK_COMMON"
-
-if [ -d "$VA_SRC_DIR" ]; then
-	if [ ! -x "$OPENVAF_BIN" ]; then
-		echo "[ERROR] OpenVAF not found at $OPENVAF_BIN, cannot build CMOS5L OSDI models."
-		exit 1
-	fi
-
-	mkdir -p "$VACASK_OSDI_DIR"
-	while IFS= read -r -d '' va_file; do
-		osdi_name="$(basename "${va_file%.va}").osdi"
-		echo "[INFO] Compiling $(basename "$va_file") -> $osdi_name for VACASK."
-		"$OPENVAF_BIN" --target_cpu generic -o "$VACASK_OSDI_DIR/$osdi_name" "$va_file"
-		echo "load \"$osdi_name\"" >> "$VACASK_COMMON"
-	done < <(find "$VA_SRC_DIR" -name "*.va" -print0 | sort -z)
-fi
-
-# Create .vacaskrc.toml. CMOS5L's own converted models plus SG13G2's
-# converted models/stdcell/io/OSDI are all needed since most CMOS5L devices
-# are symlinks to SG13G2.
-echo "[INFO] Creating sample .vacaskrc.toml"
-cat > "$PDK_ROOT/$PDK/libs.tech/vacask/.vacaskrc.toml" << EOF
-# VACASK configuration file
-[Paths]
-include_path_prefix = [
-  "\$(PDK_ROOT)/\$(PDK)/libs.tech/vacask/models",
-  "\$(PDK_ROOT)/ihp-sg13g2/libs.tech/vacask/models",
-  "\$(PDK_ROOT)/ihp-sg13g2/libs.ref/sg13g2_stdcell/vacask",
-  "\$(PDK_ROOT)/ihp-sg13g2/libs.ref/sg13g2_io/vacask"
-]
-module_path_prefix = [
-  "\$(PDK_ROOT)/\$(PDK)/libs.tech/vacask/osdi",
-  "\$(PDK_ROOT)/ihp-sg13g2/libs.tech/vacask/osdi"
-]
-EOF
-
 # ---------------------------------------------------------------------------
-# TEMPORARY: xschem/VACASK glue for CMOS5L.
+# Fixup 3: correct the xschem-vacask Tcl that sg13cmos5ltovc.py installs.
 #
-# sg13g2tovc.py patches xschem symbols and xschemrc only for ihp-sg13g2, so the
-# CMOS5L-own symbols get no spectre_format= line and cap_cmomi cannot be
-# netlisted for VACASK from xschem at all. This reuses the upstream patchers
-# (xschem2vc + sg13g2tovc.patch_analog/patch_dig) rather than reimplementing
-# them, so it can be dropped as one block once VACASK ships ihp-sg13cmos5l
-# support (requested as https://codeberg.org/arpadbuermen/VACASK/issues/94).
-# Symbols that are symlinks into ihp-sg13g2 are skipped -- they were
-# already patched in place in the SG13G2 tree by install_ihp.sh.
+# The converter copies python/sg13g2xschem.tcl into xschem-vacask even though
+# it ships a CMOS5L variant (python/sg13cmos5lxschem.tcl) right beside it, so
+# the "Add VACASK models symbol" menu entry pulls in SG13G2's common include
+# instead of CMOS5L's. And neither variant is right about the corners: both
+# list cornerHBT.lib, which CMOS5L does not have (no HBT). Swap in the diode
+# and PNP corners it does have instead.
 # ---------------------------------------------------------------------------
-echo "[INFO] Adding xschem VACASK support for CMOS5L."
-PYTHONPATH="/tmp/${VACASK_NAME}/python" python3 - "$PDK_ROOT" "$PDK" "/tmp/${VACASK_NAME}" << 'PYEOF'
+echo "[INFO] Fixing xschem VACASK menu entry for CMOS5L."
+python3 - "$PDK_ROOT" "$PDK" "/tmp/${VACASK_NAME}" << 'PYEOF'
 import os
-import shutil
 import sys
 
-import xschem2vc
-import sg13g2tovc
-
 pdkroot, pdk, vacask_dir = sys.argv[1], sys.argv[2], sys.argv[3]
-xschem_dir = os.path.join(pdkroot, pdk, "libs.tech", "xschem")
+dest = os.path.join(pdkroot, pdk, "libs.tech", "xschem", "xschem-vacask")
 
-# (symbol directory, format= patcher)
-sym_dirs = [
-    ("sg13cmos5l_pr", sg13g2tovc.patch_analog),
-    ("sg13cmos5l_stdcells", sg13g2tovc.patch_dig),
-]
+src = os.path.join(vacask_dir, "python", "sg13cmos5lxschem.tcl")
+if not os.path.isfile(src):
+    print("[WARN] sg13cmos5lxschem.tcl not found, falling back to the SG13G2 one")
+    src = os.path.join(vacask_dir, "python", "sg13g2xschem.tcl")
 
-for subdir, patcher in sym_dirs:
-    d = os.path.join(xschem_dir, subdir)
-    if not os.path.isdir(d):
-        print(f"[INFO] No {subdir} symbol directory, skipping.")
-        continue
-    own_syms = sorted(
-        e.path for e in os.scandir(d)
-        if e.name.endswith(".sym") and not e.is_symlink() and e.is_file()
-    )
-    print(f"Patching {len(own_syms)} CMOS5L-own symbols in {subdir}")
-    for symfile in own_syms:
-        xschem2vc.convert(symfile, patcher)
+with open(src) as f:
+    tcl = f.read()
 
-# xschemrc extension. The upstream Tcl is PDK-agnostic apart from the
-# "Add VACASK models symbol" menu entry, which names the SG13G2 common include
-# and a corner set CMOS5L does not have (no HBT).
-tcl = open(os.path.join(vacask_dir, "python", "sg13g2xschem.tcl")).read()
-tcl = tcl.replace('include \\"sg13g2_vacask_common.lib\\"',
-                  'include \\"sg13cmos5l_vacask_common.lib\\"')
-tcl = tcl.replace('include \\"cornerHBT.lib\\" section=hbt_typ\n',
-                  'include \\"cornerDIO.lib\\" section=dio_tt\n'
-                  'include \\"cornerPNP.lib\\" section=typ\n')
+common_g2 = 'include \\"sg13g2_vacask_common.lib\\"'
+common_5l = 'include \\"sg13cmos5l_vacask_common.lib\\"'
+if common_g2 in tcl:
+    tcl = tcl.replace(common_g2, common_5l)
+    print("[INFO] xschem-vacask: common include -> sg13cmos5l_vacask_common.lib")
+elif common_5l not in tcl:
+    print("[WARN] xschem-vacask: no common include found (upstream changed?)")
 
-with open(os.path.join(xschem_dir, "xschem-vacask"), "w") as f:
+hbt = 'include \\"cornerHBT.lib\\" section=hbt_typ\n'
+corners = ('include \\"cornerDIO.lib\\" section=dio_tt\n'
+           'include \\"cornerPNP.lib\\" section=typ\n')
+if hbt in tcl:
+    tcl = tcl.replace(hbt, corners)
+    print("[INFO] xschem-vacask: cornerHBT -> cornerDIO + cornerPNP")
+elif corners not in tcl:
+    print("[WARN] xschem-vacask: corner list not patched (already fixed upstream?)")
+
+with open(dest, "w") as f:
     f.write(tcl)
-
-# Append the VACASK block to xschemrc, keeping a pristine .orig so a rebuild
-# does not stack the block twice.
-xschemrc = os.path.join(xschem_dir, "xschemrc")
-xschemrc_orig = xschemrc + ".vacask-orig"
-if not os.path.isfile(xschemrc_orig):
-    shutil.copy(xschemrc, xschemrc_orig)
-
-with open(xschemrc_orig) as f:
-    base = f.read()
-
-with open(xschemrc, "w") as f:
-    f.write(base)
-    f.write("""
-# VACASK support
-if {[info exists PDK_ROOT]} {
-  if {[info exists PDK]} {
-    if {[file exists $PDK_ROOT/$PDK/libs.tech/xschem/xschem-vacask]} {
-      source $PDK_ROOT/$PDK/libs.tech/xschem/xschem-vacask
-    }
-  }
-}
-
-# Netlist type
-if {[info exists env(XSCHEM_NETLIST_TYPE)]} {
-  puts "Netlist mode: $::env(XSCHEM_NETLIST_TYPE)"
-  set netlist_type $::env(XSCHEM_NETLIST_TYPE)
-} else {
-  puts "Netlist mode: <default>"
-}
-""")
 PYEOF
 
-# Drop the symbol backups xschem2vc leaves behind. Its patcher is idempotent
-# without them (an existing spectre_format= line is recomputed and replaced).
-find "$PDK_ROOT/$PDK/libs.tech/xschem" -name "*.sym.orig" -delete
+# Drop the backups the converter leaves behind: xschemrc.orig from its own
+# xschemrc patcher and *.sym.orig from xschem2vc's symbol patcher.
+find "$PDK_ROOT/$PDK/libs.tech/xschem" -name "*.orig" -delete
+if [ -d "$PDK_ROOT/$PDK/libs.ref/sg13cmos5l_stdcell/sym" ]; then
+	find "$PDK_ROOT/$PDK/libs.ref/sg13cmos5l_stdcell/sym" -name "*.orig" -delete
+fi
 
 rm -rf "/tmp/${VACASK_NAME}"
 
