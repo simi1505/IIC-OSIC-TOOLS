@@ -16,7 +16,7 @@ RUNS_DIR=${IIC_TEST_RUNDIR:-/tmp/iic-osic-tools-tests}
 DEBUG=${DEBUG:-0}
 
 TMP=${RUNS_DIR}/${RAND}/26
-LOG=$TMP/lvs_drc_pex_sg13g2.log
+LOG=$TMP/drc_lvs_pex_sg13g2.log
 REPO=open-pdks-regression-tests
 
 mkdir -p "$TMP"
