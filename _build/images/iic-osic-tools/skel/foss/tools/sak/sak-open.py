@@ -482,6 +482,8 @@ class Launcher:
         self.menu.add_separator()
         self.menu.add_command(label="Scope here", command=self.scope_here)
         self.menu.add_command(label="Back to full tree", command=self.unscope)
+        self.menu.add_command(label="Fold all", command=lambda: self.fold_all(True))
+        self.menu.add_command(label="Unfold all", command=lambda: self.fold_all(False))
         self.menu.add_separator()
         self.menu.add_command(label="Save view", command=self.save_view)
         self.menu.add_command(label="Restore view", command=self.restore_view)
@@ -587,6 +589,7 @@ class Launcher:
             rel = path.relative_to(self.root_dir)
             groups.setdefault(rel.parent, []).append(path)
 
+        self.group_dirs = set(groups)  # what "Fold all" acts on
         matched = sum(len(v) for v in groups.values())
         hidden = sum(len(v) for d, v in groups.items() if d in self.folded)
         openable = matched - hidden
@@ -598,19 +601,29 @@ class Launcher:
         for rel_dir in sorted(groups, key=lambda p: str(p).lower()):
             folded = rel_dir in self.folded
             if shown >= budget and not folded:
-                break
+                # Out of budget: draw nothing for this one, but keep going --
+                # a folded directory further down still needs its heading, or
+                # there would be no way left to click it open.
+                continue
             # The heading is a label of our own so it can be clicked; a folded
             # group keeps it and drops the buttons, which is what makes folding
             # cheap in X resources as well as in screen space.
             mark = "▸" if folded else "▾"
             label = ttk.Label(
-                self.inner, text=f"{mark} {rel_dir}  ({len(groups[rel_dir])})", font=heading
+                self.inner,
+                text=f"{mark} {rel_dir}  ({len(groups[rel_dir])})",
+                font=heading,
+                cursor="hand2",
             )
             label.bind("<Button-1>", lambda _e, d=rel_dir: self.toggle_fold(d))
+            if folded:
+                # Packed on its own, not as the label of an empty LabelFrame:
+                # such a frame collapses to a hairline and clips the heading,
+                # which leaves a stray white line and nothing to click.
+                label.pack(anchor="w", padx=6, pady=3)
+                continue
             frame = ttk.LabelFrame(self.inner, labelwidget=label, padding=(6, 4))
             frame.pack(fill="x", expand=True, pady=3)
-            if folded:
-                continue
             for col in range(cols):
                 frame.columnconfigure(col, weight=1, uniform="files")
             for i, path in enumerate(groups[rel_dir][: budget - shown]):
@@ -798,6 +811,12 @@ class Launcher:
         where = self.canvas.yview()[0]
         self.populate()
         self.canvas.yview_moveto(where)
+
+    def fold_all(self, folded):
+        """Collapse or open every directory on screen at once."""
+        self.folded = set(self.group_dirs) if folded else set()
+        self.populate()
+        self.canvas.yview_moveto(0.0)
 
     def _sync_controls(self):
         """Grey out what cell view ignores, so it reads as inert, not broken."""
