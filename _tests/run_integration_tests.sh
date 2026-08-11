@@ -90,7 +90,10 @@ mkdir -p "$HOST_RUNDIR"
 # Test 28 alone defines the wall clock of the whole suite, so it must start
 # first. Note these are runtimes *under full contention*; standalone they are
 # considerably shorter (21: 108 s, 27: 78 s).
-SLOW_TESTS="28 26 24 20 21 01 10 07 18 22 19 04 15"
+# Test 31 measured about 1800 s standalone (it does the same per-cell DRC/LVS/PEX
+# work as 26, on 25 instead of 30 cells), so it is queued right next to it. Its
+# runtime under contention is not measured yet.
+SLOW_TESTS="28 26 31 24 20 21 01 10 07 18 22 19 04 15"
 
 # The current directory is bind-mounted at $WORKDIR in the container, so the
 # test list can be assembled here and the paths just re-based. Matching the
