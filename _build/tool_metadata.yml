@@ -15,7 +15,7 @@
   commit: dc6d965225c9f5ed2a6faefb7ea30665429060fe
 - name: ghdl
   repo: https://github.com/ghdl/ghdl.git
-  commit: ea079441cff01f054727e9de583ec441b2cabb19
+  commit: 93f6a931f7700a46845583fa54580c5c4261f48b
 - name: ghdl-yosys-plugin
   repo: https://github.com/ghdl/ghdl-yosys-plugin.git
   commit: a45a8fbf19827cd9c4780b00cec9781ef9961293
@@ -30,7 +30,7 @@
   commit: 037a1b97086ef8425bdd9379e38f6aada4f327e7
 - name: iverilog
   repo: https://github.com/steveicarus/iverilog.git
-  commit: 008b76eae6faa59f72259bf4932995bf38e1e1c3
+  commit: 1d2aa1b6fa0add7723c99d624a9df01d3dec9282
 - name: kactus2
   repo: https://github.com/kactus2/kactus2dev.git
   commit: v3.14.1
@@ -69,7 +69,7 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: 4ede5f5b17f1cf82c7f188cf9a51905fb68dc750
+  commit: ec94b92b31c9d2bfcb90129068d0967b1a94f5c1
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
@@ -144,7 +144,7 @@
   commit: 9051f4804fe8f6386272085f604c9238e5ac0b05
 - name: xschem
   repo: https://github.com/StefanSchippers/xschem.git
-  commit: 1563b0199b1123f261660a075b1cda05c5ba1f85
+  commit: 8869a957ccad366b07bb0eb25ce60aa26aff6261
 - name: xyce
   repo: https://github.com/Xyce/Xyce.git
   commit: Release-7.10.0
