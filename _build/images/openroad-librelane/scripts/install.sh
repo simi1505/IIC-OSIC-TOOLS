@@ -23,6 +23,11 @@ git clone --filter=blob:none "${OPENROAD_LIBRELANE_REPO_URL}" "${OPENROAD_LIBREL
 cd "${OPENROAD_LIBRELANE_NAME}" || exit 1
 git checkout "${OPENROAD_LIBRELANE_REPO_COMMIT}"
 git submodule update --init --recursive
+# LibreLane's nix build applies this patch on top of its pinned OpenROAD revision
+# (vendored from librelane 3.1.0.dev2, nix/patches/openroad/grt_pin_layers.patch);
+# apply it here as well so our binary matches the official LibreLane one. Re-check
+# whether it is still carried when bumping the librelane or OpenROAD pin.
+git apply /images/openroad-librelane/patches/grt_pin_layers.patch
 # Fix Tcl_Size compatibility: SWIG 4.2 generates Tcl_Size (Tcl 9.0) but we have Tcl 8.6.
 # Patch system tcl.h so ALL compilation units see it (including SWIG-generated wrappers).
 # OpenROAD ships the fallback typedef itself since b59f6331 (PR #10061, 2026-04-06), but
