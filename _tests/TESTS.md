@@ -60,7 +60,7 @@ Test 21 additionally runs its own (small) inner pool of simulation jobs; use `AC
 | 23       | Smoke/regression test of sak-lvs.sh (all PDKs, Magic+Netgen and KLayout)                                                        |
 | 24       | Smoke/regression test of sak-drc.sh (all PDKs, Magic and KLayout)                                                               |
 | 25       | Smoke/regression test of sak-pex.sh (all PDKs and PEX modes)                                                                    |
-| 26       | [open-pdks regression tests](https://github.com/iic-jku/open-pdks-regression-tests) (LVS, DRC, PEX) with ihp-sg13g2             |
+| 26       | [open-pdks regression tests](https://github.com/iic-jku/open-pdks-regression-tests) (DRC, LVS, PEX) with ihp-sg13g2             |
 | 27       | KLayout PCells smoke/regression test (instantiate all PCells of all PDKs, flag empty cells and errors)                          |
 | 28       | [TinyWhisper](https://github.com/iic-jku/TinyWhisper) multi-mode short-wave transmitter with ihp-sg13g2                         |
 | 29       | cap_cmomi MoM capacitor with ihp-sg13cmos5l (ngspice OSDI and VACASK model conversion)                                          |
