@@ -36,7 +36,7 @@
   commit: v3.14.1
 - name: kepler-formal
   repo: https://github.com/keplertech/kepler-formal.git
-  commit: 609bd074ef3dc0032360b62b4d2d67f5c136cf6b
+  commit: e58e3f2ae63e2fc0663162d018f09593c7f67275
 - name: klayout
   repo: https://github.com/KLayout/klayout.git
   commit: v0.30.10
@@ -51,10 +51,10 @@
   commit: 1.5.323
 - name: nextpnr
   repo: https://github.com/YosysHQ/nextpnr.git
-  commit: 930fef448efda3401606b1fb2cd2b3de7b7eaf24
+  commit: 51e703d094528f44324ae7fc016f4d1333b4f70c
 - name: ngspice
   repo: https://github.com/danchitnis/ngspice-sf-mirror.git
-  commit: ngspice-46
+  commit: ngspice-47
 - name: ngspyce
   repo: https://github.com/ignamv/ngspyce.git
   commit: 154a2724080e3bf15827549bba9f315cd11984fe
@@ -69,7 +69,7 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: ec94b92b31c9d2bfcb90129068d0967b1a94f5c1
+  commit: 7a370f6036c36729c91e1b589ced5922e45eb2e3
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
@@ -84,7 +84,7 @@
   commit: 17fba2638142baa4dc6e2a0b18cb1cd542017e16
 - name: palace
   repo: https://github.com/awslabs/palace.git
-  commit: cf2c15a0a33fac05cb5e48e58b08fc1a538b5c12
+  commit: 3c83b9db0014f87dea003873064f843fa802ac32
 - name: pyopus
   repo: https://fides.fe.uni-lj.si/pyopus/download
   commit: '0.12'
@@ -102,16 +102,16 @@
   commit: 9c61d29846d8521d9487a57739330f9682d5b542
 - name: slang
   repo: https://github.com/MikePopoloski/slang.git
-  commit: e222e7dc0250231312f14c37d47404a49df00fe2
+  commit: e3291f8fe002c22d625732b928877b73688d8e07
 - name: slang-yosys-plugin
   repo: https://github.com/povik/yosys-slang.git
-  commit: e2829839afc62961d704123f30ed46e75477f33c
+  commit: ce38835520fbdf422304a6f6a2f1c437c3ba98c2
 - name: spicebind
   repo: https://github.com/themperek/spicebind.git
   commit: a63974c81391c10c0700244c32c0b7733ae711b1
 - name: spike
   repo: https://github.com/riscv-software-src/riscv-isa-sim.git
-  commit: 16c0b60119f65a648643cf5d41e4e38e871f0bad
+  commit: e1fa113cfb6d55d878a3c1ea3befa8d9c13ce154
 - name: surelog
   repo: https://github.com/chipsalliance/Surelog.git
   commit: v1.86
@@ -132,13 +132,13 @@
   commit: 0.12.3
 - name: vacask
   repo: https://codeberg.org/arpadbuermen/VACASK.git
-  commit: b9ca96ed8882bbc64969463ba3245c037ff5060b
+  commit: 02d518c3b3f4ccc23f4efc6db787fe1cd782a362
 - name: verilator
   repo: https://github.com/verilator/verilator.git
   commit: v5.050
 - name: verible
   repo: https://github.com/chipsalliance/verible.git
-  commit: v0.0-4135-g7807ee1a
+  commit: v0.0-4137-ga207d621
 - name: xcircuit
   repo: https://github.com/RTimothyEdwards/XCircuit.git
   commit: 9051f4804fe8f6386272085f604c9238e5ac0b05
