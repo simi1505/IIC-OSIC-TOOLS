@@ -9,18 +9,6 @@ cd /tmp || exit 1
 git clone --filter=blob:none "${LIBMAN_REPO_URL}" "${LIBMAN_NAME}"
 cd "${LIBMAN_NAME}" || exit 1
 git checkout "${LIBMAN_REPO_COMMIT}"
-# Qt6 removed QString::SkipEmptyParts; Qt::SkipEmptyParts works on Qt5.14+ and
-# Qt6, so this is a pure compatibility patch (still needed as of 2026-08-06,
-# upstream HEAD == LIBMAN_REPO_COMMIT).
-# Reported as https://github.com/IHP-GmbH/LibMan/issues/5; drop this once it is fixed.
-# Fail loudly instead of silently doing
-# nothing if a future commit no longer contains the old spelling: the patch can
-# then be dropped.
-if ! grep -q 'QString::SkipEmptyParts' src/mainwindow.cpp; then
-	echo "[ERROR] LibMan no longer uses QString::SkipEmptyParts, remove this patch"
-	exit 1
-fi
-sed -i 's/QString::SkipEmptyParts/Qt::SkipEmptyParts/g' src/mainwindow.cpp
 mkdir -p build
 cd build || exit 1
 # CommonDB (CORE) is a private IHP repo we have no token for; build without it.
