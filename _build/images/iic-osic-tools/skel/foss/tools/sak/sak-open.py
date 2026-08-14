@@ -844,8 +844,14 @@ class Launcher:
     def launch(self, cmd, cwd, note):
         self.procs = [p for p in self.procs if p.poll() is None]  # reap
         try:
-            self.procs.append(
-                subprocess.Popen(cmd, cwd=cwd, start_new_session=True)
+            # cwd= changes the working directory but leaves the inherited $PWD behind, 
+            # and the PDK xschemrc files resolve netlist_dir from $env(PWD).
+            # Keep both in step, like a shell cd does.
+            proc = subprocess.Popen(
+                cmd,
+                cwd=cwd,
+                start_new_session=True,
+                env={**os.environ, "PWD": str(cwd)},
             )
         except (OSError, ValueError) as exc:
             self.set_status(f"cannot run {' '.join(cmd)}: {exc}")
