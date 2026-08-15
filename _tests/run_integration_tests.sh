@@ -58,6 +58,14 @@ if ${CONTAINER_ENGINE} --version 2>/dev/null | grep -qi "podman"; then
     fi
 fi
 
+# The bind-mounted source tree keeps its host label, which "container_t" may not
+# access. See README section 5.1.1 and the start scripts.
+if [[ "$OSTYPE" == "linux"* ]] && \
+    { { command -v selinuxenabled > /dev/null 2>&1 && selinuxenabled; } || [ -f /sys/fs/selinux/enforce ]; }; then
+    echo "[INFO] SELinux detected, adding --security-opt label=disable."
+    ENGINE_EXTRA_PARAMS="${ENGINE_EXTRA_PARAMS} --security-opt label=disable"
+fi
+
 FULL_TAG=$1
 RAND=$(hexdump -e '/1 "%02x"' -n4 < /dev/urandom)
 export RAND

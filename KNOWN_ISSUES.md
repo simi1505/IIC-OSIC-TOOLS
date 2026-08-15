@@ -101,9 +101,30 @@ instead of detecting capabilities and avoids the crash. The only cost is ARM
 crypto acceleration inside the container. Export `OPENSSL_armcap` yourself to
 pin a different mask, or export it empty to switch the workaround off.
 
+### SELinux Hosts (Fedora, RHEL and Clones)
+
+On hosts with SELinux the container runs as `container_t`, while the bind-mounted
+X11/Wayland sockets keep their host label `user_tmp_t` and the designs directory
+keeps `user_home_t`. Access to both is denied: `start_x.sh` shows no window and
+the container exits a few seconds after the start, and `/foss/designs` is
+inaccessible in every mode. The denials show up in `sudo ausearch -m avc -ts recent`.
+See <https://github.com/iic-jku/IIC-OSIC-TOOLS/issues/352>.
+
+Since image `2026.08` the `start_*.sh` scripts add `--security-opt label=disable`
+when the host kernel has SELinux enabled, which switches off type enforcement for
+that container only. Set `IIC_OSIC_TOOLS_SELINUX_LABEL` to pick a different label
+option, or export it empty to switch the workaround off, see
+[Section 5.1.1 of the README](README.md#511-selinux-fedora-rhel-and-clones).
+
+Container options are fixed at create time, so a container created before this
+fix has to be removed (press `r` at the prompt) and re-created. With an older
+checkout, use `DOCKER_EXTRA_PARAMS="--security-opt label=disable" ./start_x.sh`.
+If you relabelled the designs directory by hand, undo it with
+`restorecon -R -v ~/eda/designs`.
+
 ### Podman Compatibility
 
-The IIC-OSIC-TOOLS container can be run using Podman instead of Docker. The start scripts auto-detect the installed engine (override with `CONTAINER_ENGINE=podman`), and in rootless mode they automatically add `--userns=keep-id` and default the VNC webserver port to `8080`, see [Section 5.1 of the README](README.md#51-podman).
+The IIC-OSIC-TOOLS container can be run using Podman instead of Docker. The start scripts auto-detect the installed engine (override with `CONTAINER_ENGINE=podman`), and in rootless mode they automatically add `--userns=keep-id` and default the VNC webserver port to `8080`, see [Section 5.1 of the README](README.md#51-podman). On Fedora/RHEL also see the SELinux section above.
 
 If you run *rootful* Podman with a non-root `CONTAINER_USER`, bind-mounts are mounted as root, which creates problems when accessing files inside the container. In this case, either switch to rootless Podman (recommended), or edit the desired start script and find/replace all occurrences of `:rw` with `:U,rw`, so Podman will chown the mounted directories to the given `UID` inside the container.
 
@@ -111,7 +132,7 @@ If you run *rootful* Podman with a non-root `CONTAINER_USER`, bind-mounts are mo
 
 Running Docker in rootless mode with X11/Wayland forwarding (`start_x.sh`) is not fully supported. The X11 and Wayland sockets are not accessible from the container due to UID/GID mismatches in the user namespace. There is no straightforward fix for Docker rootless mode.
 
-**Workaround:** Switch to [Podman](https://podman.io/) in rootless mode (see [Section 5.1 of the README](README.md#51-podman)). The start scripts automatically detect Podman rootless mode and add `--userns=keep-id`.
+**Workaround:** Switch to [Podman](https://podman.io/) in rootless mode (see [Section 5.1 of the README](README.md#51-podman)). The start scripts automatically detect Podman rootless mode and add `--userns=keep-id`. On Fedora/RHEL also see the SELinux section above.
 
 ### Palace EM-Setup
 

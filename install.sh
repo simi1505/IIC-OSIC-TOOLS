@@ -153,7 +153,7 @@ pick_dnf() {
 choose_engine() {
     echo
     log "IIC-OSIC-TOOLS can be run with Docker (default) or Podman."
-    log "The start scripts auto-detect the installed engine; pick Podman for"
+    log "The choice is recorded for the start scripts; pick Podman for"
     log "daemonless, rootless containers (recommended on shared machines)."
     if ask "Use Podman instead of Docker as the container engine?"; then
         ENGINE="podman"
@@ -161,6 +161,29 @@ choose_engine() {
         ENGINE="docker"
     fi
     ok "Selected container engine: $ENGINE"
+}
+
+# Record the choice, otherwise the start scripts fall back to auto-detection,
+# which prefers docker when both CLIs are installed.
+persist_engine() {
+    local conf_dir="${XDG_CONFIG_HOME:-$HOME/.config}/iic-osic-tools"
+    local conf="${conf_dir}/env"
+    if ! have "$ENGINE"; then
+        warn "'$ENGINE' is not installed, not recording it in $conf."
+        return
+    fi
+    if [[ -e "$conf" ]] && ! ask "Overwrite the existing settings file $conf?"; then
+        warn "Kept $conf unchanged; prefix the start scripts with CONTAINER_ENGINE=$ENGINE to override."
+        return
+    fi
+    mkdir -p "$conf_dir"
+    cat > "$conf" <<EOF
+# Written by install.sh, sourced by the start_*.sh scripts.
+# The ":=" form means that a value set in the environment always wins.
+: "\${CONTAINER_ENGINE:=${ENGINE}}"
+export CONTAINER_ENGINE
+EOF
+    ok "Recorded container engine '$ENGINE' in $conf."
 }
 
 # Rootless Podman needs subordinate UID/GID ranges for the current user.
@@ -523,8 +546,10 @@ show_usage_hints() {
     echo " 3) Your design files live under \$DESIGNS (default: \$HOME/eda/designs)"
     echo "    and are mounted into the container at /foss/designs."
     echo
-    echo " The start scripts auto-detect Docker or Podman; if both are"
-    echo " installed, override with e.g. CONTAINER_ENGINE=podman ./start_vnc.sh"
+    echo " The chosen container engine is recorded in"
+    echo "      ${XDG_CONFIG_HOME:-\$HOME/.config}/iic-osic-tools/env"
+    echo "    (edit or delete that file any time). Override per launch with"
+    echo "    e.g. CONTAINER_ENGINE=docker ./start_vnc.sh"
     echo
     echo " The first launch will pull the ~4 GB image from Docker Hub."
     echo " Reserve at least 20 GB of free disk space."
@@ -608,6 +633,7 @@ main() {
             if [[ "$ENGINE" == "docker" ]]; then
                 warn "If you were just added to the 'docker' group, log out and back in (or reboot) before using Docker."
             fi
+            persist_engine
             show_usage_hints
             ;;
         linux-dnf)
@@ -624,6 +650,7 @@ main() {
             if [[ "$ENGINE" == "docker" ]]; then
                 warn "If you were just added to the 'docker' group, log out and back in (or reboot) before using Docker."
             fi
+            persist_engine
             show_usage_hints
             ;;
         macos)
@@ -636,6 +663,7 @@ main() {
             fi
             step "Install XQuartz via Homebrew"           macos_install_xquartz
             step "Clone IIC-OSIC-TOOLS repository"        clone_repo
+            persist_engine
             show_usage_hints
             step "Reboot macOS (recommended final step)"  macos_reboot
             ok "macOS installation steps completed."

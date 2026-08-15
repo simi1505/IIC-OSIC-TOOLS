@@ -181,13 +181,17 @@ wait_for_x() {
         sleep 0.1
     done
 
-    echo "[WARNING] X server not ready after waiting."
+    echo "[ERROR] Cannot connect to the X server at DISPLAY=$display (waited $((retries / 10))s)."
+    echo "[ERROR] Likely causes:"
+    echo "[ERROR]   - /tmp/.X11-unix is not mounted, or the container may not write it (SELinux"
+    echo "[ERROR]     hosts need \"--security-opt label=disable\", see README section 5.1.1)"
+    echo "[ERROR]   - the cookie in XAUTHORITY=${XAUTHORITY:-<unset>} does not match this display"
+    echo "[ERROR]   - the host X server refuses the connection (check \"xhost\" on the host)"
     return 1
 }
 
-# Do not abort the script if the X server is not (yet) reachable; this only
-# affects the subsequent setxkbmap/xfce4-terminal calls which will report
-# their own errors.
+# Non-fatal: on macOS/Windows a cold X server can exceed the wait above and the
+# terminal still connects. A real failure ends the container via "wait -n" below.
 wait_for_x || true
 
 # Only set the keyboard layout for VNC sessions; in X11-forwarding mode
