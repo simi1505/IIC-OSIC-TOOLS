@@ -44,6 +44,18 @@ in the file's own directory, so xschem finds its `simulations/` and klayout its
 run outputs where they belong. It needs a display, so run it in the VNC/noVNC
 desktop or over X11 forwarding, not in a shell-only container.
 
+Schematics and symbols of one design unit share a single tabbed xschem
+instance rather than getting one process per click, remote-controlled through
+xschem's TCP interface. The unit is found from the clicked file's directory:
+without an xschemrc the directory stands alone, with one the nearest ancestor
+holding a Makefile (the macro root in the IIC design templates) is the unit,
+and when no such ancestor exists up to a .git boundary or `$DESIGNS`, the
+xschemrc's directory is. Directories grouped this way should pin netlist_dir
+in their xschemrc files, so every tab writes its simulations to one agreed
+place. `SAK_OPEN_GROUP_MARKERS` replaces the Makefile marker with a
+comma-separated list of file names, `SAK_OPEN_NO_GROUP=1` turns the sharing
+off entirely.
+
 Without an argument it scans `$DESIGNS`, falling back to the current directory
 when that is unset.
 
@@ -92,6 +104,7 @@ import argparse
 import json
 import os
 import shlex
+import socket
 import subprocess
 import sys
 import time
@@ -153,6 +166,13 @@ VIEWERS = {
 # The terminal the right-click menu opens, and its override.
 TERMINAL = ["xfce4-terminal"]
 TERMINAL_ENV = "SAK_OPEN_TERMINAL"
+
+# Marker files whose directory roots a design unit for xschem instance
+# sharing, the override for that list, and the switch that turns the sharing
+# off altogether. See group_root().
+GROUP_MARKERS = "Makefile"
+GROUP_MARKERS_ENV = "SAK_OPEN_GROUP_MARKERS"
+NO_GROUP_ENV = "SAK_OPEN_NO_GROUP"
 
 # Where "Save view" keeps the folded directories, per scanned tree.
 CONFIG = Path(
@@ -244,6 +264,43 @@ def viewer_cmd(ext):
     return shlex.split(override) if override else list(spec["cmd"])
 
 
+def group_root(directory):
+    """The directory whose xschem instance the files in `directory` share.
+
+    Without an xschemrc the directory stands alone: the stock configuration
+    makes netlists land next to wherever xschem starts, so directories must
+    not share an instance. With an xschemrc, the nearest ancestor holding a
+    group marker (a Makefile, which is the macro root in the IIC design
+    templates) is the unit whose files share one instance. No marker up to a
+    .git boundary, $DESIGNS or the filesystem root means the xschemrc's own
+    directory is the unit. Directories grouped by a marker are expected to
+    pin netlist_dir in their xschemrc files, so every tab of the shared
+    instance writes its simulations to one agreed place.
+    """
+    if not (directory / "xschemrc").is_file():
+        return directory
+    markers = [
+        m for m in os.environ.get(GROUP_MARKERS_ENV, GROUP_MARKERS).split(",") if m
+    ]
+    designs = os.environ.get("DESIGNS")
+    stop = Path(designs).resolve() if designs else None
+    ancestor = directory
+    while True:
+        if any((ancestor / marker).exists() for marker in markers):
+            return ancestor
+        boundary = (ancestor / ".git").exists() or ancestor == stop
+        if boundary or ancestor.parent == ancestor:
+            return directory
+        ancestor = ancestor.parent
+
+
+def free_port():
+    """An unused TCP port. The small race until xschem binds it is accepted."""
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
 def read_config():
     """The saved views, or an empty one. A damaged file is not fatal here."""
     try:
@@ -319,6 +376,7 @@ class Launcher:
         self.files = []
         self.found = {}  # extension -> how many the last scan turned up
         self.procs = []
+        self.xschem_groups = {}  # group_root -> {"proc": ..., "port": ...}
 
         self.win = tk.Tk()
         self.win.title(f"sak-open - {root_dir}")
@@ -835,22 +893,88 @@ class Launcher:
         self.launch(terminal_cmd() + [f"--working-directory={where}"], where, str(where))
 
     def open(self, path):
+        cmd = viewer_cmd(ext_of(path))
+        if cmd[0] == "xschem" and not os.environ.get(NO_GROUP_ENV):
+            self.open_xschem(cmd, path)
+            return
         self.launch(
-            viewer_cmd(ext_of(path)) + [path.name],
+            cmd + [path.name],
             path.parent,
             f"in {path.parent.relative_to(self.root_dir)}",
         )
 
+    def open_xschem(self, cmd, path):
+        """Open `path` as a tab of its design unit's shared xschem instance.
+
+        The first file of a unit starts xschem with a remote-control port and
+        the tabbed interface, every later one is handed to that instance as a
+        load_new_window command. A unit whose instance was closed, or one that
+        does not answer on its port, gets a fresh instance.
+        """
+        group = group_root(path.parent)
+        entry = self.xschem_groups.get(group)
+        if entry and entry["proc"].poll() is None:
+            if self.xschem_send(entry["port"], f"xschem load_new_window {{{path}}}"):
+                self.set_status(f"{path.name}   (tab in the {group.name} xschem)")
+                return
+        port = free_port()
+        proc = self.launch(
+            cmd
+            + [
+                "--tcl",
+                f"set xschem_listen_port {port}; set tabbed_interface 1",
+                path.name,
+            ],
+            path.parent,
+            f"in {path.parent.relative_to(self.root_dir)}",
+        )
+        if proc is not None:
+            self.xschem_groups[group] = {"proc": proc, "port": port}
+
+    def xschem_send(self, port, command, wait=4.0):
+        """Send a remote command, giving a starting instance time to listen.
+
+        True when the command reached the instance. The wait covers the gap
+        between launching xschem and its server socket coming up, in which a
+        click on a second file of the unit would otherwise fork a stray
+        second instance.
+        """
+        deadline = time.monotonic() + wait
+        while True:
+            try:
+                with socket.create_connection(
+                    ("127.0.0.1", port), timeout=1.0
+                ) as sock:
+                    sock.sendall(command.encode() + b"\n")
+                    sock.shutdown(socket.SHUT_WR)
+                    try:
+                        sock.recv(1024)  # the command's result, not needed
+                    except OSError:
+                        pass
+                return True
+            except OSError:
+                if time.monotonic() >= deadline:
+                    return False
+                time.sleep(0.3)
+
     def launch(self, cmd, cwd, note):
         self.procs = [p for p in self.procs if p.poll() is None]  # reap
         try:
-            self.procs.append(
-                subprocess.Popen(cmd, cwd=cwd, start_new_session=True)
+            # cwd= changes the working directory but leaves the inherited $PWD behind, 
+            # and the PDK xschemrc files resolve netlist_dir from $env(PWD).
+            # Keep both in step, like a shell cd does.
+            proc = subprocess.Popen(
+                cmd,
+                cwd=cwd,
+                start_new_session=True,
+                env={**os.environ, "PWD": str(cwd)},
             )
         except (OSError, ValueError) as exc:
             self.set_status(f"cannot run {' '.join(cmd)}: {exc}")
-        else:
-            self.set_status(f"{' '.join(cmd)}   ({note})")
+            return None
+        self.procs.append(proc)
+        self.set_status(f"{' '.join(cmd)}   ({note})")
+        return proc
 
     def run(self):
         self.win.mainloop()
