@@ -69,13 +69,20 @@ EXPECTED = {
             "gf180mcu_klayoutapi/diode_pw2dw": "unbounded allocation in Cell.flatten",
         },
     },
+    # Both IHP PDKs are installed from a branch rather than from a pinned
+    # commit (see install_ihp.sh / install_ihp_cmos5l.sh), so these counts move
+    # whenever upstream adds a device and a rebuild picks it up.
     "ihp-sg13g2": {
-        # 34 until the PDK bump of 2026-08 added cmomi, moscap_n and moscap_p.
-        "count": 37,
+        # 34 until the PDK bump of 2026-08 added cmomi, moscap_n and moscap_p,
+        # 37 until cap_cmomf, the metal fringe MoM capacitor, landed on
+        # 2026-08-11. SG13_dev registers 37, SG13_native_pcell_lib adds Via.
+        "count": 38,
         "known_bad": {},
     },
     "ihp-sg13cmos5l": {
-        "count": 24,
+        # 24 until the PDK gained cap_cmomf and guard_ring on 2026-08-11.
+        # SG13_dev registers 25, SG13_native_pcell_lib adds Via.
+        "count": 26,
         "known_bad": {},
     },
 }

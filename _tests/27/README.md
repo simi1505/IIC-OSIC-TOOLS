@@ -38,8 +38,14 @@ debugging a regression.
 | ---------------- | ------------------------------------------------------------ | ------ |
 | sky130A          | `skywater130`                                                 | 18     |
 | gf180mcuD        | `gf180mcu` + `gf180mcu_klayoutapi` + `gf180mcu_sealring`      | 61     |
-| ihp-sg13g2       | `SG13_dev` + `SG13_native_pcell_lib`                          | 37     |
-| ihp-sg13cmos5l   | `SG13_dev`                                                    | 24     |
+| ihp-sg13g2       | `SG13_dev` + `SG13_native_pcell_lib`                          | 38     |
+| ihp-sg13cmos5l   | `SG13_dev` + `SG13_native_pcell_lib`                          | 26     |
+
+Both IHP PDKs are installed from a branch and not from a pinned commit, so a
+rebuild can pick up new devices and move these numbers. That is what the count
+check is for: it turns a silent inventory change into a failure that has to be
+looked at. Most recently the metal fringe MoM capacitor `cap_cmomf` (2026-08-11)
+took SG13G2 from 37 to 38 and, together with `guard_ring`, CMOS5L from 24 to 26.
 
 ## Expected-dirty baselines
 

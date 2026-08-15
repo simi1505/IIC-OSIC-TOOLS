@@ -144,4 +144,18 @@ At least since tag `2025.12` GDS3D is crashing with an error message. Unfortunat
 
 ## Build
 
-No known issues at the moment. However, be warned that building the image is quite involved and may take several hours depending on the host system performance and network connection. For a multi-architecture build (`amd64` + `arm64`) dedicated build servers with sufficient resources are recommended. Cross-architecture builds take ages and are not recommended. Plus, a private Docker registry is currently used by the build system to store intermediate build stages, which requires a fast network connection to the registry server.
+### The IHP PDKs Are Built from a Branch, Not from a Pinned Commit
+
+Unlike every other component of the image, the two IHP PDKs are installed from the tip of a branch: `ihp-sg13g2` from the `dev` branch of `iic-jku/IHP-Open-PDK` and `ihp-sg13cmos5l` from the default branch of `iic-jku/ihp-sg13cmos5l`. This is deliberate — both move fast and the image is expected to carry their current state — but it means two rebuilds of the same commit of this repository can produce different PDK content, and that new devices can appear without any change here.
+
+That is not free, and the failure it causes is indirect. When the PDK gains a device, the corner files gain an `.include` for it, while the tools that consume the PDK are pinned and know nothing about it. VACASK's `sg13cmos5ltovc.py` converter, for example, names the model files it converts and the Verilog-A it compiles in two hardcoded lists, so a new device is silently skipped — yet the corner file including it is converted verbatim. Every VACASK deck pulling in that corner then fails on a missing include, even one that uses none of its devices. The metal fringe MoM capacitor `cap_cmomf`, added to both PDKs on 2026-08-11, broke the entire `ihp-sg13cmos5l` VACASK capacitor path exactly this way.
+
+The image therefore does not assume the two sides agree:
+
+- the converter's device lists are completed from the installed PDK before it runs, so a device the PDK ships but VACASK does not know about is converted and compiled anyway (a no-op once VACASK catches up);
+- after the conversion, every include in the converted model files is resolved, and every OSDI object the PDK's own `.spiceinit` loads is checked to exist, so an incomplete conversion fails the build instead of shipping;
+- regression test 27 pins the pcell count of every PDK, which turns an inventory change into a failure that has to be looked at rather than a silent drift.
+
+The counts in `_tests/27/check_pcells.py` consequently need updating whenever the PDKs legitimately gain or lose a pcell; the test reports the expected and the actual number so the change can be reviewed.
+
+No further known issues at the moment. However, be warned that building the image is quite involved and may take several hours depending on the host system performance and network connection. For a multi-architecture build (`amd64` + `arm64`) dedicated build servers with sufficient resources are recommended. Cross-architecture builds take ages and are not recommended. Plus, a private Docker registry is currently used by the build system to store intermediate build stages, which requires a fast network connection to the registry server.

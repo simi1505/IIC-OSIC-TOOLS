@@ -130,37 +130,70 @@ find . -name "testing" -print0 | xargs -0 rm -rf
 # Remove *.orig files created during PDK preparation
 find "$PDK_ROOT/$PDK/libs.tech/xschem" -name "*.orig" -delete
 
-# Add missing symlinks from CMOS5L pycell_lib to SG13G2 pycell_lib
-# The CMOS5L PDK uses symlinks to SG13G2 PCell code (e.g. nmos_code.py),
-# but some new dependencies (device_base_code.py, guard_ring_code.py) added
-# upstream in SG13G2 are not yet symlinked in the CMOS5L repo.
-CMOS5L_IHP="$PDK_ROOT/$PDK/libs.tech/klayout/python/sg13cmos5l_pycell_lib/ihp"
-SG13G2_IHP="../../../../../../ihp-sg13g2/libs.tech/klayout/python/sg13g2_pycell_lib/ihp"
-for pyfile in device_base_code.py guard_ring_code.py; do
-    if [ ! -e "$CMOS5L_IHP/$pyfile" ] && [ -e "$PDK_ROOT/ihp-sg13g2/libs.tech/klayout/python/sg13g2_pycell_lib/ihp/$pyfile" ]; then
-        ln -s "$SG13G2_IHP/$pyfile" "$CMOS5L_IHP/$pyfile"
-        echo "[INFO] Created missing symlink: $pyfile"
-    fi
-done
-
 # Rebuild the CMOS5L-own Verilog-A models for ngspice, the same way
 # install_ihp.sh does for SG13G2: in-image and with --compile-model-generic, so
-# the resulting OSDI runs on any host CPU. The PDK repo ships a prebuilt
-# cap_cmomi.osdi, but it comes from whoever committed it (unknown OpenVAF version
-# and target CPU), so it is not trustworthy for the image. psp103 and r3_cmc are
-# symlinks into SG13G2 and are already compiled by install_ihp.sh.
+# the resulting OSDI runs on any host CPU. The PDK repo ships the objects
+# prebuilt, but they come from whoever committed them (unknown OpenVAF version
+# and target CPU), so they are not trustworthy for the image. psp103 and r3_cmc
+# are symlinks into SG13G2 and are already compiled by install_ihp.sh.
 # NOTE: this is the ngspice copy in libs.tech/ngspice/osdi. The VACASK copies in
 # libs.tech/vacask/osdi are built separately further down.
+#
+# The device list is derived from the PDK rather than spelled out, because the
+# PDK is installed from its default branch and grows devices (cap_cmomf arrived
+# this way in 2026-08). A CMOS5L-own model is a real directory <name>/<name>.va;
+# psp103 and r3_cmc are symlinks into SG13G2 and are skipped.
 echo "[INFO] Compiling Verilog-A models."
 export PATH="$TOOLS/openvaf/bin:$PATH"
-# Drop the prebuilt object first: openvaf-compile-va.sh does not set -e, so
-# without this the check below would happily pass on the stale shipped file.
-rm -f "$PDK_ROOT/$PDK/libs.tech/ngspice/osdi/cap_cmomi.osdi"
-cd "$PDK_ROOT/$PDK/libs.tech/verilog-a" || exit 1
+VA_DIR="$PDK_ROOT/$PDK/libs.tech/verilog-a"
+NGSPICE_OSDI_DIR="$PDK_ROOT/$PDK/libs.tech/ngspice/osdi"
+CMOS5L_VA_MODULES=""
+for va_module in "$VA_DIR"/*/; do
+	va_module=${va_module%/}
+	[ -L "$va_module" ] && continue
+	va_name=$(basename "$va_module")
+	[ -f "$va_module/$va_name.va" ] || continue
+	CMOS5L_VA_MODULES="$CMOS5L_VA_MODULES $va_name"
+done
+if [ -z "$CMOS5L_VA_MODULES" ]; then
+	echo "[ERROR] No CMOS5L-own Verilog-A model found in $VA_DIR!"
+	exit 1
+fi
+echo "[INFO] CMOS5L-own Verilog-A models:$CMOS5L_VA_MODULES"
+
+# Drop the prebuilt objects first: openvaf-compile-va.sh does not set -e, so
+# without this the check below would happily pass on the stale shipped files.
+for va_name in $CMOS5L_VA_MODULES; do
+	rm -f "$NGSPICE_OSDI_DIR/$va_name.osdi"
+done
+cd "$VA_DIR" || exit 1
 chmod +x openvaf-compile-va.sh
 ./openvaf-compile-va.sh --compile-model-generic
-if [ ! -f "$PDK_ROOT/$PDK/libs.tech/ngspice/osdi/cap_cmomi.osdi" ]; then
-	echo "[ERROR] OpenVAF model compilation for ngspice failed!"
+
+# Verify every OSDI object the PDK's own .spiceinit loads is there. That covers
+# the models just compiled and, as a bonus, the SG13G2 ones reached by symlink
+# (-f follows the link, so a dangling one is caught too). A missing object makes
+# every ngspice run using that device fail at load time, which is worth failing
+# the build for rather than shipping.
+SPICEINIT="$PDK_ROOT/$PDK/libs.tech/ngspice/.spiceinit"
+OSDI_MISSING=0
+for va_name in $CMOS5L_VA_MODULES; do
+	if [ ! -f "$NGSPICE_OSDI_DIR/$va_name.osdi" ]; then
+		echo "[ERROR] OpenVAF model compilation for ngspice failed: $va_name.osdi not built!"
+		OSDI_MISSING=1
+	fi
+done
+if [ -f "$SPICEINIT" ]; then
+	for osdi_name in $(grep -o '[A-Za-z0-9_]*\.osdi' "$SPICEINIT" | sort -u); do
+		if [ ! -f "$NGSPICE_OSDI_DIR/$osdi_name" ]; then
+			echo "[ERROR] $osdi_name is loaded by .spiceinit but missing in $NGSPICE_OSDI_DIR!"
+			OSDI_MISSING=1
+		fi
+	done
+else
+	echo "[WARN] $SPICEINIT not found, cannot verify the OSDI objects ngspice loads."
+fi
+if [ "$OSDI_MISSING" -ne 0 ]; then
 	exit 1
 fi
 
@@ -172,6 +205,12 @@ fi
 # Needs VACASK >= b9ca96e, which keeps the conversion of the models CMOS5L
 # symlinks from SG13G2 inside the CMOS5L tree and makes cap_cmomi's feed
 # default a literal, so it stays overridable (regression test 29).
+#
+# The converter names the devices it handles in two hardcoded lists, while the
+# PDK is installed unpinned and grows devices between VACASK releases, so the
+# lists are completed from the PDK before it runs (see the helper for what that
+# costs when it is not done -- it broke the whole CMOS5L VACASK capacitor path
+# when cap_cmomf arrived).
 echo "[INFO] Preparing IHP CMOS5L PDK for VACASK."
 cd /tmp || exit 1
 rm -rf "${VACASK_NAME}"
@@ -198,9 +237,38 @@ else
 fi
 cd /tmp || exit 1
 
+# Complete the converter's device lists from the PDK before running it.
+echo "[INFO] Checking the VACASK converter against the installed PDK."
+python3 "$PDK_SCRIPT_DIR/fix_cmos5l_vacask_converter.py" \
+	"/tmp/${VACASK_NAME}/python/sg13cmos5ltovc.py" "$PDK_ROOT/$PDK"
+
 OPENVAF_DIR=${TOOLS}/openvaf/bin PYTHONPATH=/tmp/${VACASK_NAME}/python \
     PDK_ROOT="$PDK_ROOT" PDK="$PDK" \
     python3 -m sg13cmos5ltovc --openvaf-options --target_cpu generic
+
+# Every file the converted models include has to exist, or a deck pulling in
+# that file dies on the include even when it uses none of the devices behind it
+# -- which is exactly how the missing cap_cmomf conversion broke the whole
+# CMOS5L capacitor path via cornerCAP.lib. Checked here rather than trusted,
+# because the unpinned PDK and the pinned converter drift independently.
+# ng2vclib writes includes as 'include "<file>"[ section=<sec>]' (see
+# ng2vclib/m_output.py), with paths relative to the including file.
+echo "[INFO] Verifying the converted VACASK model includes resolve."
+VACASK_MODELS="$PDK_ROOT/$PDK/libs.tech/vacask/models"
+INCLUDE_MISSING=0
+for model in "$VACASK_MODELS"/*.lib; do
+	[ -f "$model" ] || continue
+	for inc in $(sed -n 's/^[[:space:]]*include[[:space:]]*"\([^"]*\)".*/\1/p' "$model" | sort -u); do
+		if [ ! -f "$(dirname "$model")/$inc" ]; then
+			echo "[ERROR] $(basename "$model") includes $inc, which was not converted!"
+			INCLUDE_MISSING=1
+		fi
+	done
+done
+if [ "$INCLUDE_MISSING" -ne 0 ]; then
+	echo "[ERROR] The VACASK model conversion is incomplete."
+	exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Add the diode and PNP corners to the "Add VACASK models symbol" menu entry.
