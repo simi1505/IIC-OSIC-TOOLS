@@ -85,6 +85,25 @@ pip3 install $PIP_FLAGS \
 	spicelib==1.6.3 \
 	spyci==1.0.2
 
+# librelane's Toolbox.get_lib_voltage() is the only Liberty reader in the flow
+# that opens the file with a plain open(), so with the PDKs' LIB pointing at
+# .lib.gz (see open_pdks/scripts/gzip_liberty.sh) OpenROAD.IRDropReport -- the
+# LAST step of the Classic flow -- dies with
+#   RuntimeError: Syntax error in liberty file on line 1.  Unexpected token:
+# after synthesis, routing, RCX and post-PnR STA have all passed. Reported as
+# librelane/librelane#627. The patch header explains why librelane's own
+# gzopen() does not fix it (libparse reads through fileno()).
+#
+# The patch is deliberately NOT forgiving: if a librelane bump changes that
+# function, `patch` fails and the build stops, which is the signal to re-check
+# whether the fix landed upstream and this block can go.
+echo "[INFO] Patching librelane get_lib_voltage() to read gzipped Liberty"
+LIBRELANE_SITE=$(python3 -c 'import importlib.util as u, os; print(os.path.dirname(os.path.dirname(u.find_spec("librelane").origin)))')
+LIBRELANE_TOOLBOX="${LIBRELANE_SITE}/librelane/common/toolbox.py"
+[ -f "$LIBRELANE_TOOLBOX" ] || { echo "[ERROR] librelane toolbox.py not found"; exit 1; }
+patch -p0 --batch -r - -d "$LIBRELANE_SITE" < /headless/scripts/patches/librelane-get-lib-voltage-gzip.patch
+python3 -m py_compile "$LIBRELANE_TOOLBOX"
+
 # The four packages pulling in PySide6 (chipify, snp2le, gds2palace, setupEM)
 # only use QtWidgets/QtCore/QtGui/QtSvg, all of which live in
 # PySide6-Essentials. The PySide6-Addons half (~340 MB, dominated by a 254 MB

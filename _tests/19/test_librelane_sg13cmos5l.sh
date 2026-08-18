@@ -25,9 +25,32 @@ if command -v librelane >/dev/null 2>&1; then
     mkdir -p "$WORKDIR"
     find "$DIR" -maxdepth 1 -type f -exec cp {} "$WORKDIR" \;
     librelane --manual-pdk "$WORKDIR/counter.json" > "$LOG" 2> "$STDERR_LOG"
-    # Check if there is an error in the log
-    if grep -q "ERROR" "$LOG"; then
-        echo "[ERROR] Test <LibreLane smoke-test with ihp-sg13cmos5l> FAILED. Check the logs <$LOG> and <$STDERR_LOG>."
+    LL_RC=$?
+
+    # Grepping the stdout log for "ERROR" is not enough on its own. A step that
+    # dies from an uncaught exception prints its traceback on stderr, leaves no
+    # "ERROR" in the stdout log, and the run's own error.log stays empty -- so
+    # this test reported "passed" over a flow that crashed in
+    # OpenROAD.IRDropReport, the LAST step, where everything before it looks
+    # perfect (gzipped Liberty, see install_eda.sh). Check the exit code, both
+    # logs, and that the flow actually reached its end.
+    FAILED=""
+    [ "$LL_RC" -eq 0 ] || FAILED="librelane exited with $LL_RC"
+    if [ -z "$FAILED" ] && grep -q "ERROR" "$LOG"; then
+        FAILED="ERROR in the stdout log"
+    fi
+    if [ -z "$FAILED" ] && grep -q "Traceback (most recent call last)" "$STDERR_LOG"; then
+        FAILED="Python traceback in the stderr log"
+    fi
+    # The Classic flow writes final/metrics.json only after its last step, so a
+    # missing one means the run stopped early no matter how quiet it was.
+    if [ -z "$FAILED" ] && \
+        [ -z "$(find "$WORKDIR/runs" -maxdepth 3 -path "*/final/metrics.json" -print -quit 2>/dev/null)" ]; then
+        FAILED="the flow produced no final/metrics.json"
+    fi
+
+    if [ -n "$FAILED" ]; then
+        echo "[ERROR] Test <LibreLane smoke-test with ihp-sg13cmos5l> FAILED ($FAILED). Check the logs <$LOG> and <$STDERR_LOG>."
         exit 1
     else
         echo "[INFO] Test <LibreLane smoke-test with ihp-sg13cmos5l> passed."

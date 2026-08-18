@@ -1,0 +1,44 @@
+Subject: [PATCH] common: read gzipped Liberty in Toolbox.get_lib_voltage()
+
+Toolbox.get_lib_voltage() is the only Liberty reader in librelane that opens
+the file with a plain open(). With a PDK whose LIB points at .lib.gz, that
+takes down OpenROAD.IRDropReport -- the last step of the Classic flow -- with
+
+    RuntimeError: Syntax error in liberty file on line 1.  Unexpected token:
+
+after synthesis, routing, RCX and post-PnR STA have all passed.
+
+Swapping in librelane's own gzopen() is NOT enough: libparse.LibertyParser is
+a C++ extension that reads through the stream's fileno(), so it sees the raw
+compressed bytes and fails identically (an io.StringIO fails outright with
+"UnsupportedOperation: fileno"). The gzipped file has to be materialized.
+
+Reported upstream as https://github.com/librelane/librelane/issues/627
+Against librelane 3.1.0.dev3. Drop this once the pinned release carries a fix.
+---
+--- librelane/common/toolbox.py	2026-08-18 15:39:58.909129817 +0200
++++ librelane/common/toolbox.py	2026-08-18 15:39:58.942702567 +0200
+@@ -527,7 +527,22 @@
+         :param input_lib: The lib file in question
+         :returns: The voltage in question
+         """
+-        parser = libparse.LibertyParser(open(input_lib, encoding="utf8"))
++        # libparse parses through the stream's fileno(), so a Python-level
++        # decompressing wrapper (gzopen) is not enough for gzipped Liberty:
++        # the C++ side reads the raw compressed bytes straight off the fd and
++        # fails with "Syntax error in liberty file on line 1". Materialize a
++        # plain file instead. Sniffed rather than keyed on the extension, so a
++        # gzipped file named .lib is handled too.
++        lib_path = input_lib
++        with open(input_lib, "rb") as f:
++            is_gzipped = f.read(2) == b"\x1f\x8b"
++        if is_gzipped:
++            mkdirp(self.tmp_dir)
++            lib_path = os.path.join(self.tmp_dir, f"{uuid.uuid4().hex}.lib")
++            with gzopen(input_lib) as src, open(lib_path, "w", encoding="utf8") as dst:
++                shutil.copyfileobj(src, dst)
++
++        parser = libparse.LibertyParser(open(lib_path, encoding="utf8"))
+         ast = parser.ast
+ 
+         default_operating_conditions_id = None
