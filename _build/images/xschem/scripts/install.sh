@@ -70,4 +70,23 @@ append postinit_commands {
 }
 EOF
 
+# Let xschem run the Tcl scripts embedded in schematics and symbols without putting
+# up a confirmation dialog, which the PDK launcher symbols and the tcleval() attributes
+# need in order to work silently. This has to live in the system-wide xschemrc, because
+# that is the only file xschem is guaranteed to read: after sourcing it, xschem sources
+# exactly one of ./xschemrc in the directory it was started in or ~/.xschem/xschemrc,
+# whichever it finds first, and never both. Every IIC design template ships a
+# project-local xschemrc, so the shipped user xschemrc is shadowed in most real
+# sessions. A plain "set" is enough here, unlike the two settings above: none of the
+# packaged PDK xschemrc files touches the variable, so nothing sourced later overrides
+# it, and the value is only read when a schematic is loaded, which happens after the
+# whole rc chain has run.
+cat >> "${TOOLS}/${XSCHEM_NAME}/share/xschem/xschemrc" <<'EOF'
+
+###########################################################################
+#### ALLOW EMBEDDED TCL SCRIPTS WITHOUT ASKING
+###########################################################################
+set xschem_execute_scripts yes
+EOF
+
 echo "${XSCHEM_NAME} ${XSCHEM_REPO_COMMIT}" > "${TOOLS}/${XSCHEM_NAME}/SOURCES"
