@@ -32,7 +32,7 @@ export LIBGL_ALWAYS_INDIRECT=0
 
 Some browsers reserve *hold the right mouse button and move* for their own mouse gestures and consume it before the page sees it. In the browser session this silently swallows every right-button drag: the press and the release still arrive, the motion in between does not. In KLayout the visible effect is that the right-drag zoom box never appears and the context menu opens instead; the same applies to any other right-button drag in any tool.
 
-`Vivaldi` ships this enabled — switch it off under `Settings > Mouse > Gestures` by unticking `Allow Gestures`. If left/right button combinations misbehave as well, `Rocker Gestures` on the same page does the same thing to those. Other browsers with a gesture feature (`Opera`, or a gesture extension in `Chrome`/`Firefox`) can intercept the drag in the same way; look for a "mouse gestures" option and turn it off. `Safari`, `Chrome` and `Firefox` have no such feature by default and are unaffected, as is the plain VNC mode, where no browser sits in the path.
+`Vivaldi` ships this enabled; switch it off under `Settings > Mouse > Gestures` by unticking `Allow Gestures`. If left/right button combinations misbehave as well, `Rocker Gestures` on the same page does the same thing to those. Other browsers with a gesture feature (`Opera`, or a gesture extension in `Chrome`/`Firefox`) can intercept the drag in the same way; look for a "mouse gestures" option and turn it off. `Safari`, `Chrome` and `Firefox` have no such feature by default and are unaffected, as is the plain VNC mode, where no browser sits in the path.
 
 Note that up to image `2026.07` this was partly masked by a defect in the shipped noVNC `1.3.0`: a lost button release left the button held down at the X server, which made the zoom box follow the pointer anyway. Fixing that in `2026.08` (noVNC `1.7.0`) removed the accidental workaround, so the gesture conflict now shows up plainly.
 
@@ -48,7 +48,7 @@ The image addresses these automatically (issue <https://github.com/iic-jku/IIC-O
 Three further pcell defects are patched at PDK-install time as well, and the patches are removed once they are fixed upstream:
 
 - IHP `ihp-sg13g2`/`ihp-sg13cmos5l`: the pcell libraries preprocess every pcell module into `$TMPDIR/<module>_pre.py` and delete it again, using the bare module name. Both PDKs use the same module names, so two KLayout processes sharing `/tmp` deleted each other's file and the loser registered no pcell at all. The temp file now carries the process ID (issue <https://github.com/IHP-GmbH/IHP-Open-PDK/issues/1087>).
-- IHP `ihp-sg13g2`: `sealring` obtained the PDK version by running `git` inside the PDK tree, which is installed without its `.git` — it now reads the `COMMIT` file next to the PDK. `isolbox` defaulted its length and width below the minimum its own callback enforces, warning on every default instantiation.
+- IHP `ihp-sg13g2`: `sealring` obtained the PDK version by running `git` inside the PDK tree, which is installed without its `.git`. It now reads the `COMMIT` file next to the PDK. `isolbox` defaulted its length and width below the minimum its own callback enforces, warning on every default instantiation.
 - Global Foundries `gf180mcuD`: the `efuse` pcell came out empty, because `draw_efuse()` was called without its required `device_name` argument and looked for its GDS in `~/.klayout/pymacros`, where nothing installs it.
 
 Regression test 27 (`_tests/27`) instantiates every pcell of every packaged PDK with its default parameters and pins the outcome, so a regression or an upstream fix is reported.
@@ -88,7 +88,7 @@ Note that in X11 mode Surfer is software-rendered inside the container and every
 ### Illegal Instruction (SIGILL) on Apple Silicon
 
 On Apple Silicon the Linux VM that backs the container engine advertises the CPU
-feature `SVE2` in `HWCAP2` while the base `SVE` bit in `HWCAP` stays clear — a
+feature `SVE2` in `HWCAP2` while the base `SVE` bit in `HWCAP` stays clear, a
 combination that cannot occur on real hardware, since SVE2 implies SVE. SVE
 instructions then trap. The CPU probe of AWS-LC/OpenSSL trusts the SVE2 bit and
 executes one (`cntb`, in `_armv8_sve_get_vl_bytes`) at library load time, so any
@@ -154,9 +154,9 @@ At least since tag `2025.12` GDS3D is crashing with an error message. Unfortunat
 
 ### The IHP PDKs Are Built from a Branch, Not from a Pinned Commit
 
-Unlike every other component of the image, the two IHP PDKs are installed from the tip of a branch: `ihp-sg13g2` from the `dev` branch of `iic-jku/IHP-Open-PDK` and `ihp-sg13cmos5l` from the default branch of `iic-jku/ihp-sg13cmos5l`. This is deliberate — both move fast and the image is expected to carry their current state — but it means two rebuilds of the same commit of this repository can produce different PDK content, and that new devices can appear without any change here.
+Unlike every other component of the image, the two IHP PDKs are installed from the tip of a branch: `ihp-sg13g2` from the `dev` branch of `iic-jku/IHP-Open-PDK` and `ihp-sg13cmos5l` from the default branch of `iic-jku/ihp-sg13cmos5l`. This is deliberate (both move fast and the image is expected to carry their current state), but it means two rebuilds of the same commit of this repository can produce different PDK content, and that new devices can appear without any change here.
 
-That is not free, and the failure it causes is indirect. When the PDK gains a device, the corner files gain an `.include` for it, while the tools that consume the PDK are pinned and know nothing about it. VACASK's `sg13cmos5ltovc.py` converter, for example, names the model files it converts and the Verilog-A it compiles in two hardcoded lists, so a new device is silently skipped — yet the corner file including it is converted verbatim. Every VACASK deck pulling in that corner then fails on a missing include, even one that uses none of its devices. The metal fringe MoM capacitor `cap_cmomf`, added to both PDKs on 2026-08-11, broke the entire `ihp-sg13cmos5l` VACASK capacitor path exactly this way.
+That is not free, and the failure it causes is indirect. When the PDK gains a device, the corner files gain an `.include` for it, while the tools that consume the PDK are pinned and know nothing about it. VACASK's `sg13cmos5ltovc.py` converter, for example, names the model files it converts and the Verilog-A it compiles in two hardcoded lists, so a new device is silently skipped, yet the corner file including it is converted verbatim. Every VACASK deck pulling in that corner then fails on a missing include, even one that uses none of its devices. The metal fringe MoM capacitor `cap_cmomf`, added to both PDKs on 2026-08-11, broke the entire `ihp-sg13cmos5l` VACASK capacitor path exactly this way.
 
 The image therefore does not assume the two sides agree:
 
