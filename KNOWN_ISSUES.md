@@ -53,6 +53,14 @@ Three further pcell defects are patched at PDK-install time as well, and the pat
 
 Regression test 27 (`_tests/27`) instantiates every pcell of every packaged PDK with its default parameters and pins the outcome, so a regression or an upstream fix is reported.
 
+### KLayout 0.30.10 Reports False DRC Violations in Deep Mode
+
+`KLayout` `0.30.10`, shipped with image `2026.08`, finds two-layer separation and enclosure violations in hierarchical (`deep`) mode that are not in the layout. On the stock `gf180mcuD` standard cell `gf180mcu_fd_sc_mcu7t5v0__dffrnq_1` it reports `DF.6_MV`, `PL.5a_MV` and `PL.5b_MV`; `0.30.9` reports none of them, and neither does `0.30.10` in flat mode. Rule deck and cell geometry are byte-identical between the two versions, so this is the tool and not the PDK.
+
+The visible consequence in this image is that regression test 04 (LibreLane with `gf180mcuD`) fails at `KLayout.DRC`. To tell a real violation from this one, rerun the deck with `-rd run_mode=flat`.
+
+Reported as [KLayout issue 2423](https://github.com/KLayout/klayout/issues/2423). It is not the already-fixed [issue 2416](https://github.com/KLayout/klayout/issues/2416): adding `.merged` to the first input of the affected rules does not change the result.
+
 ### The OpenROAD Flow Scripts (ORFS)
 
 The ORFS require a recent version of `openroad`. Since image tag `2024.12` a recent version is installed alongside the OpenROAD version required by `librelane`. In tag `2025.10` and beyond the `openroad` and `sta` version that is found is a recent version that can be used with the ORFS.In order to use the ORFS, **before** calling the `make` script make sure to set the following env vars:
