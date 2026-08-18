@@ -15,7 +15,7 @@
   commit: dc6d965225c9f5ed2a6faefb7ea30665429060fe
 - name: ghdl
   repo: https://github.com/ghdl/ghdl.git
-  commit: 3815871cd11f2e73a40a7bdcf153604d20c275b2
+  commit: b6446f0f08246dd50b64d6ba12ffd0a4a5d6de3f
 - name: ghdl-yosys-plugin
   repo: https://github.com/ghdl/ghdl-yosys-plugin.git
   commit: a45a8fbf19827cd9c4780b00cec9781ef9961293
@@ -30,7 +30,7 @@
   commit: 037a1b97086ef8425bdd9379e38f6aada4f327e7
 - name: iverilog
   repo: https://github.com/steveicarus/iverilog.git
-  commit: 1d2aa1b6fa0add7723c99d624a9df01d3dec9282
+  commit: b5fdf06475e690ca6db5e0e2bb7749c1c0f9256b
 - name: kactus2
   repo: https://github.com/kactus2/kactus2dev.git
   commit: v3.14.1
@@ -69,7 +69,7 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: cbc7678e45cc27f3f321b57103b68552e3663043
+  commit: c06932fa494b1d5ca637ac79e73b278f014bcd65
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
@@ -120,7 +120,7 @@
   commit: v0.7.0
 - name: sv2v
   repo: https://github.com/zachjs/sv2v.git
-  commit: 6662fa5da71f87797598060f17728b284b99a9fc
+  commit: 493a88f930802da68f592c192ec86991eaf95c49
 - name: svck
   repo: https://github.com/AsFigo/svck.git
   commit: 997b49c20705ca3d99e8c0ebe57d6a7840513bb4
@@ -132,19 +132,19 @@
   commit: 0.12.5
 - name: vacask
   repo: https://codeberg.org/arpadbuermen/VACASK.git
-  commit: 03671b607795234fe5a2c41f272031726a807a19
+  commit: bf59752fbfdfed18dc7fe2e3e11a9c02f8de28a0
 - name: verilator
   repo: https://github.com/verilator/verilator.git
   commit: v5.050
 - name: verible
   repo: https://github.com/chipsalliance/verible.git
-  commit: v0.0-4141-g09a245fe
+  commit: v0.0-4148-g1ea007ec
 - name: xcircuit
   repo: https://github.com/RTimothyEdwards/XCircuit.git
   commit: 9051f4804fe8f6386272085f604c9238e5ac0b05
 - name: xschem
   repo: https://github.com/StefanSchippers/xschem.git
-  commit: 064c923caccfe0a043512aafbc1e418c4e8b04e4
+  commit: cd839861c3ad9fba23a7ef373fb21f0665585c9f
 - name: xyce
   repo: https://github.com/Xyce/Xyce.git
   commit: Release-7.10.0
