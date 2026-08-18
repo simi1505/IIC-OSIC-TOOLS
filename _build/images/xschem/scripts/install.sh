@@ -77,10 +77,10 @@ EOF
 # exactly one of ./xschemrc in the directory it was started in or ~/.xschem/xschemrc,
 # whichever it finds first, and never both. Every IIC design template ships a
 # project-local xschemrc, so the shipped user xschemrc is shadowed in most real
-# sessions. A plain "set" is used here rather than postinit_commands, because the value
-# is read while the schematic named on the command line is loaded, which is before
-# postinit_commands run. None of the packaged PDK xschemrc files touch the variable, so
-# nothing sourced later overrides it.
+# sessions. A plain "set" is enough here, unlike the two settings above: none of the
+# packaged PDK xschemrc files touches the variable, so nothing sourced later overrides
+# it, and the value is only read when a schematic is loaded, which happens after the
+# whole rc chain has run.
 cat >> "${TOOLS}/${XSCHEM_NAME}/share/xschem/xschemrc" <<'EOF'
 
 ###########################################################################
