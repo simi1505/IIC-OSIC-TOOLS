@@ -15,7 +15,7 @@
   commit: dc6d965225c9f5ed2a6faefb7ea30665429060fe
 - name: ghdl
   repo: https://github.com/ghdl/ghdl.git
-  commit: b6446f0f08246dd50b64d6ba12ffd0a4a5d6de3f
+  commit: 3b3dc6ec5aa80ac693adcaea180dc6f70119d039
 - name: ghdl-yosys-plugin
   repo: https://github.com/ghdl/ghdl-yosys-plugin.git
   commit: a45a8fbf19827cd9c4780b00cec9781ef9961293
@@ -69,7 +69,7 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: c06932fa494b1d5ca637ac79e73b278f014bcd65
+  commit: c8e73fe7e222fb93a80b7ecb7ea7cc83df2459ec
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
@@ -102,7 +102,7 @@
   commit: 9c61d29846d8521d9487a57739330f9682d5b542
 - name: slang
   repo: https://github.com/MikePopoloski/slang.git
-  commit: e3291f8fe002c22d625732b928877b73688d8e07
+  commit: 7ce5f186b9eeadd0e9cede10e791533dc54724f0
 - name: slang-yosys-plugin
   repo: https://github.com/povik/yosys-slang.git
   commit: ce38835520fbdf422304a6f6a2f1c437c3ba98c2
@@ -111,7 +111,7 @@
   commit: 382f58f1824105f6341825b863ee3c6ae07b3e38
 - name: spike
   repo: https://github.com/riscv-software-src/riscv-isa-sim.git
-  commit: 4b3f708b06cb541e53d6752b18ebc67e9c67fbfb
+  commit: 262df8bfac33b0419688429dd066487744db5c79
 - name: surelog
   repo: https://github.com/chipsalliance/Surelog.git
   commit: v1.86
