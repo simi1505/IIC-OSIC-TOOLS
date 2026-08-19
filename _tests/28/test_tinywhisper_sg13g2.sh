@@ -27,9 +27,9 @@ REPO=TinyWhisper
 mkdir -p "$TMP"
 cd "$TMP" || exit 1
 
-# Clone the main branch of the TinyWhisper repository (incl. submodules)
-[ "$DEBUG" = 1 ] && echo "[INFO] Cloning $REPO (main branch, incl. submodules) ..."
-if ! git clone --depth 1 --recursive --shallow-submodules --branch main \
+# Clone the next_release branch of the TinyWhisper repository (incl. submodules)
+[ "$DEBUG" = 1 ] && echo "[INFO] Cloning $REPO (next_release branch, incl. submodules) ..."
+if ! git clone --depth 1 --recursive --shallow-submodules --branch next_release \
         https://github.com/iic-jku/"$REPO".git "$REPO" > "$LOG" 2>&1; then
     echo "[ERROR] Test <TinyWhisper with ihp-sg13g2> FAILED! Could not clone the repository. Check the log file $LOG for details."
     exit 1
