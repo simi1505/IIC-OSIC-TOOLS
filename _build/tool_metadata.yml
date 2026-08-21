@@ -15,7 +15,7 @@
   commit: dc6d965225c9f5ed2a6faefb7ea30665429060fe
 - name: ghdl
   repo: https://github.com/ghdl/ghdl.git
-  commit: 3b3dc6ec5aa80ac693adcaea180dc6f70119d039
+  commit: 753dfcf0b8d87f6aa8929efd0b73a9e57e105b63
 - name: ghdl-yosys-plugin
   repo: https://github.com/ghdl/ghdl-yosys-plugin.git
   commit: a45a8fbf19827cd9c4780b00cec9781ef9961293
@@ -51,7 +51,7 @@
   commit: 1.5.323
 - name: nextpnr
   repo: https://github.com/YosysHQ/nextpnr.git
-  commit: 4d235150266df2fa5c2c6102c67aa16ff34e6469
+  commit: 7c0c1c40196fcca091320d06422a08749b106e53
 - name: ngspice
   repo: https://github.com/danchitnis/ngspice-sf-mirror.git
   commit: ngspice-47
@@ -69,13 +69,13 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: c8e73fe7e222fb93a80b7ecb7ea7cc83df2459ec
+  commit: fd4b90e86cfdb5059c9e6dbeeba3202cc3cb5e48
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
 - name: openvaf
   repo: https://github.com/arpadbuermen/OpenVAF.git
-  commit: 0e83f1ed2ccdc381a9e7876f31ce0358ca68687a
+  commit: 5ed9e63afe70ac95129a78af7b3732e7d431b1e5
 - name: osic-multitool
   repo: https://github.com/iic-jku/osic-multitool.git
   commit: 073506c3d032b8597f1ec4a3d211451f85d32536
@@ -84,7 +84,7 @@
   commit: 17fba2638142baa4dc6e2a0b18cb1cd542017e16
 - name: palace
   repo: https://github.com/awslabs/palace.git
-  commit: 3c83b9db0014f87dea003873064f843fa802ac32
+  commit: 86810b1909f3e05e0bf1fd78f485e59d55582b6d
 - name: pyopus
   repo: https://fides.fe.uni-lj.si/pyopus/download
   commit: '0.12'
@@ -144,7 +144,7 @@
   commit: 9051f4804fe8f6386272085f604c9238e5ac0b05
 - name: xschem
   repo: https://github.com/StefanSchippers/xschem.git
-  commit: cd839861c3ad9fba23a7ef373fb21f0665585c9f
+  commit: 7863b7c5a22549e42fe2fbcce22d367947cacecb
 - name: xyce
   repo: https://github.com/Xyce/Xyce.git
   commit: Release-7.10.0
