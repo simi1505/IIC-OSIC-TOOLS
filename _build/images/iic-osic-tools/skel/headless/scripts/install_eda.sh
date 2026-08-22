@@ -152,7 +152,7 @@ rustup default stable
 # Pinned with the crate@version form rather than --version: cargo accepts that
 # flag only for a single crate, so a second one would break the invocation.
 cargo install \
-	gdsfill --version 0.1.8 \
+	gdscheck@0.1.2 \
 	gdsfill@0.1.8 \
 	--root "${TOOLS}"
 

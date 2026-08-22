@@ -195,6 +195,7 @@ Below is a list of the current tools/PDKs already installed and ready to use:
 - [gaw3-xschem](https://github.com/StefanSchippers/xschem-gaw) waveform plot tool for `xschem`
 - [gds2palace](https://github.com/VolkerMuehlhaus/setupEM)/`setupEM` setup tools for `palace` EM simulation
 - [gds3d](https://github.com/trilomix/GDS3D) a 3D viewer for GDS files
+- [gdscheck](https://github.com/aesc-silicon/gdscheck) Rust DRC engine for GDSII layouts, with rules in YAML decks and a KLayout-compatible report database as output (IHP `SG13G2` and `SG13CMOS5L`)
 - [gdsfactory](https://github.com/gdsfactory/gdsfactory) Python library for GDS generation
 - [gdsfill](https://github.com/aesc-silicon/gdsfill) Rust tool for inserting dummy metal fill into semiconductor layouts
 - [gdspy](https://github.com/heitzmann/gdspy) Python module for the creation and manipulation of GDS files
