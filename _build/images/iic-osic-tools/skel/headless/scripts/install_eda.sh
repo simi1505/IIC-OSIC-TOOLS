@@ -149,8 +149,11 @@ export CARGO_HOME=/tmp/cargo
 export PATH=$CARGO_HOME/bin:$PATH
 rustup default stable
 
+# Pinned with the crate@version form rather than --version: cargo accepts that
+# flag only for a single crate, so a second one would break the invocation.
 cargo install \
 	gdsfill --version 0.1.8 \
+	gdsfill@0.1.8 \
 	--root "${TOOLS}"
 
 # The venvs use --system-site-packages so large dependencies already in the
