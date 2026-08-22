@@ -14,9 +14,9 @@ fi
 
 EXTRACTED_DIR="uv-${ARCH}-unknown-linux-gnu"
 FILE="${EXTRACTED_DIR}.tar.gz"
-URL="${UV_REPO_URL}/releases/download/${UV_VERSION}/${FILE}"
+URL="${UV_REPO_URL}/releases/download/${UV_REPO_COMMIT}/${FILE}"
 
-wget --no-verbose "${URL}" || { echo "[ERROR] Failed to download uv ${UV_VERSION}"; exit 1; }
+wget --no-verbose "${URL}" || { echo "[ERROR] Failed to download uv ${UV_REPO_COMMIT}"; exit 1; }
 tar xfz "${FILE}"
 rm -f "${FILE}"
 
@@ -24,4 +24,4 @@ mkdir -p "${TOOLS}/${UV_NAME}/bin"
 cp "${EXTRACTED_DIR}/uv" "${TOOLS}/${UV_NAME}/bin/"
 cp "${EXTRACTED_DIR}/uvx" "${TOOLS}/${UV_NAME}/bin/"
 
-echo "${UV_NAME} ${UV_VERSION}" > "${TOOLS}/${UV_NAME}/SOURCES"
+echo "${UV_NAME} ${UV_REPO_COMMIT}" > "${TOOLS}/${UV_NAME}/SOURCES"
