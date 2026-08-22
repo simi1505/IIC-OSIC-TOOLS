@@ -36,7 +36,7 @@
   commit: v3.14.1
 - name: kepler-formal
   repo: https://github.com/keplertech/kepler-formal.git
-  commit: 453cc2543810c5e7ffef6f432f5e6ecd8aab4078
+  commit: a1a56e944140b9303b169eabd191ec9c92a4af7a
 - name: klayout
   repo: https://github.com/KLayout/klayout.git
   commit: v0.30.10
@@ -69,7 +69,7 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: fd4b90e86cfdb5059c9e6dbeeba3202cc3cb5e48
+  commit: 8553611284f2e2fb63a7aa4c4633da01188cfbde
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
@@ -94,6 +94,12 @@
 - name: qucs-s
   repo: https://github.com/ra3xdh/qucs_s.git
   commit: 26.1.1
+- name: rftk-fastercap
+  repo: https://github.com/ediloren/FasterCap.git
+  commit: b42179a8fdd25ab42fe45527282b4a738d7e7f87
+- name: rftk-fasthenry
+  repo: https://github.com/ediloren/FastHenry2.git
+  commit: 363e43ed57ad3b9affa11cba5a86624fad0edaa9
 - name: riscv-gnu-toolchain
   repo: https://github.com/riscv-collab/riscv-gnu-toolchain.git
   commit: 2026.07.15
@@ -102,7 +108,7 @@
   commit: 9c61d29846d8521d9487a57739330f9682d5b542
 - name: slang
   repo: https://github.com/MikePopoloski/slang.git
-  commit: 7ce5f186b9eeadd0e9cede10e791533dc54724f0
+  commit: 4196d4ce4fc47fa130f2b98d90dced229c636497
 - name: slang-yosys-plugin
   repo: https://github.com/povik/yosys-slang.git
   commit: ce38835520fbdf422304a6f6a2f1c437c3ba98c2
@@ -124,9 +130,6 @@
 - name: svck
   repo: https://github.com/AsFigo/svck.git
   commit: 997b49c20705ca3d99e8c0ebe57d6a7840513bb4
-- name: trilinos
-  repo: https://github.com/trilinos/Trilinos.git
-  commit: trilinos-release-12-12-1
 - name: uv
   repo: https://github.com/astral-sh/uv.git
   commit: 0.12.5
@@ -144,10 +147,13 @@
   commit: 9051f4804fe8f6386272085f604c9238e5ac0b05
 - name: xschem
   repo: https://github.com/StefanSchippers/xschem.git
-  commit: 7863b7c5a22549e42fe2fbcce22d367947cacecb
+  commit: f7fa702c13cd1f5479e2aa414fe25c001148f8d1
 - name: xyce
   repo: https://github.com/Xyce/Xyce.git
   commit: Release-7.10.0
+- name: xyce-trilinos
+  repo: https://github.com/trilinos/Trilinos.git
+  commit: trilinos-release-12-12-1
 - name: yices2
   repo: https://github.com/SRI-CSL/yices2.git
   commit: 05178c03ddf49c6bba63c5c7153774c11a5da12d
