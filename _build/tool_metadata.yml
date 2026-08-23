@@ -21,7 +21,7 @@
   commit: a45a8fbf19827cd9c4780b00cec9781ef9961293
 - name: gtkwave
   repo: https://github.com/gtkwave/gtkwave.git
-  commit: 7d7b4db9e2f5485afe2aeeab0ad112f5b6a9b94b
+  commit: 132a0863a5ce97c275fd35f1c88cd7cc4f2b4ca9
 - name: icestorm
   repo: https://github.com/YosysHQ/icestorm.git
   commit: f31c39cc2eadd0ab7f29f34becba1348ae9f8721
@@ -30,7 +30,7 @@
   commit: 037a1b97086ef8425bdd9379e38f6aada4f327e7
 - name: iverilog
   repo: https://github.com/steveicarus/iverilog.git
-  commit: b5fdf06475e690ca6db5e0e2bb7749c1c0f9256b
+  commit: 5726589caca80a333306344977320e976e76997e
 - name: kactus2
   repo: https://github.com/kactus2/kactus2dev.git
   commit: v3.14.1
@@ -51,7 +51,7 @@
   commit: 1.5.323
 - name: nextpnr
   repo: https://github.com/YosysHQ/nextpnr.git
-  commit: 7c0c1c40196fcca091320d06422a08749b106e53
+  commit: b17408e29024fe1870a74ef192e2e1f8246e73a5
 - name: ngspice
   repo: https://github.com/danchitnis/ngspice-sf-mirror.git
   commit: ngspice-47
@@ -69,7 +69,7 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: 8553611284f2e2fb63a7aa4c4633da01188cfbde
+  commit: f34c1bcd954a4ecfe33233466e03782cb2d5442d
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
@@ -102,7 +102,7 @@
   commit: 363e43ed57ad3b9affa11cba5a86624fad0edaa9
 - name: riscv-gnu-toolchain
   repo: https://github.com/riscv-collab/riscv-gnu-toolchain.git
-  commit: 2026.07.15
+  commit: 2026.08.23
 - name: riscv-pk
   repo: https://github.com/riscv-software-src/riscv-pk.git
   commit: 9c61d29846d8521d9487a57739330f9682d5b542
@@ -117,7 +117,7 @@
   commit: 382f58f1824105f6341825b863ee3c6ae07b3e38
 - name: spike
   repo: https://github.com/riscv-software-src/riscv-isa-sim.git
-  commit: 262df8bfac33b0419688429dd066487744db5c79
+  commit: 231e0d535d371eed4a7f5781d82ea0a8b96bdae2
 - name: surelog
   repo: https://github.com/chipsalliance/Surelog.git
   commit: v1.86
