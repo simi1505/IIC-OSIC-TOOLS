@@ -15,7 +15,20 @@ else
 fi
 OPENVAF_OPTIONS="--target_cpu generic"
 
-# Install custom libboost since stock libboost version is too old
+# Install custom libboost since stock libboost version is too old.
+#
+# BOOST_PROCESS_V2_DISABLE_PIDFD_OPEN: Boost.Process v2 picks its process handle
+# at compile time, from whether the *build* host's headers define SYS_pidfd_open
+# (they always do on Ubuntu 24.04). It then constructs an asio descriptor from
+# syscall(SYS_pidfd_open, ...) with no runtime fallback, so on a host kernel
+# older than 5.3 -- RHEL/Rocky/Alma 8 ship 4.18 -- the syscall returns ENOSYS and
+# assign(-1) throws "assign: Bad file descriptor" out of a constructor, which
+# aborts the process. VACASK spawns Python through boost::process (runProcess()
+# in lib/processutils.cpp), so every deck with a postprocess(PYTHON, ...) died on
+# such hosts; regression test 29 is the one that catches it. The macro selects
+# the signal-based process handle instead, which needs no pidfd. It has to be set
+# for the Boost build *and* for the VACASK compile, since it changes a type both
+# sides share.
 BOOST_VERSION="1.88.0"
 BOOST_DIR="boost_${BOOST_VERSION//./_}"
 BOOST_ARCHIVE="${BOOST_DIR}.tar.gz"
@@ -26,6 +39,7 @@ cd "${BOOST_DIR}/tools/build"
 ./bootstrap.sh gcc
 cd ../..
 tools/build/b2 -j "$(nproc)" --with-filesystem --with-process --with-asio link=static toolset=gcc \
+    define=BOOST_PROCESS_V2_DISABLE_PIDFD_OPEN \
     cxxflags="${MARCH_FLAGS}" cflags="${MARCH_FLAGS}"
 cd ..
 
@@ -53,7 +67,7 @@ fi
 mkdir -p build && cd build
 cmake -G Ninja -S .. -B . \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_FLAGS="${MARCH_FLAGS}" \
+    -DCMAKE_CXX_FLAGS="${MARCH_FLAGS} -DBOOST_PROCESS_V2_DISABLE_PIDFD_OPEN" \
     -DCMAKE_C_FLAGS="${MARCH_FLAGS}" \
     -DOPENVAF_OPTIONS="${OPENVAF_OPTIONS}" \
     -DOPENVAF_DIR="${TOOLS}/openvaf/bin" \
