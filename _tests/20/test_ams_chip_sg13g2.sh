@@ -13,6 +13,8 @@ fi
 # test output is kept out of the bind-mounted source tree (see run_integration_tests.sh)
 RUNS_DIR=${IIC_TEST_RUNDIR:-/tmp/iic-osic-tools-tests}
 
+DEBUG=${DEBUG:-0}
+
 TMP=${RUNS_DIR}/${RAND}/20
 LOG=$TMP/ams_chip_sg13g2.log
 REPO=ihp-sg13g2-ams-chip-template
