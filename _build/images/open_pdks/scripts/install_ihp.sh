@@ -296,6 +296,30 @@ else
     echo "[WARN] nBuLay DRC rule deck not found at $NBULAY_DRC"
 fi
 
+# The parallel-simulation launchers in the xschem test schematics call
+# "python3 <script>" straight from Tcl -- same class of defect as the `mkdir -p`
+# that was fixed in xschem-menu (IHP-Open-PDK 96fe2b70). It only appears to work
+# when xschem is started in a terminal foreground: Tk_Main() then sets
+# tcl_interactive to 1 and Tcl's `unknown` handler auto-executes external
+# programs. Started detached -- from sak-open, the desktop entry, or with
+# `xschem &` -- tcl_interactive stays 0 and the launcher dies with
+# `invalid command name "python3"`.
+# `exec >&@stdout` is what the auto-exec fallback does: run the program with its
+# output going to xschem's stdout, rather than capturing it and turning anything
+# the child writes to stderr into a Tcl error (which plain `exec` would do).
+echo "[INFO] Fixing the parallel-simulation launchers in the xschem test schematics."
+for tb in inv_mc_tb.sch inv_sweep_tb.sch isolbox_sweep_tb.sch; do
+	TB_FILE="$PDK_ROOT/$PDK/libs.tech/xschem/sg13g2_tests/$tb"
+	if [ ! -f "$TB_FILE" ]; then
+		echo "[WARN] xschem test schematic not found at $TB_FILE"
+	elif grep -q '^python3 ' "$TB_FILE"; then
+		sed -i 's|^python3 |exec >\&@stdout python3 |' "$TB_FILE"
+		echo "[INFO] Fixed the python3 launcher in $TB_FILE"
+	else
+		echo "[WARN] No bare 'python3' launcher in $TB_FILE (already fixed upstream?)"
+	fi
+done
+
 # Remove testing folders to save space
 echo "[INFO] Removing unnecessary files to save space."
 cd "$PDK_ROOT/$PDK"
