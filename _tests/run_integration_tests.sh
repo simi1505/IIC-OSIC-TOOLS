@@ -103,7 +103,6 @@ mkdir -p "$HOST_RUNDIR"
 # runtime under contention is not measured yet.
 # Test 32 runs the same kind of template regression as 20, on the
 # ihp-sg13cmos5l sibling of that template, so it is queued right next to it.
-# Its runtime is not measured yet.
 SLOW_TESTS="28 26 31 24 20 32 21 01 10 07 18 22 19 04 15"
 
 # The current directory is bind-mounted at $WORKDIR in the container, so the
