@@ -85,6 +85,9 @@
 - name: palace
   repo: https://github.com/awslabs/palace.git
   commit: 86810b1909f3e05e0bf1fd78f485e59d55582b6d
+- name: prjtrellis
+  repo: https://github.com/YosysHQ/prjtrellis.git
+  commit: 3afe7b52b30f4b4417ee98f03016767a502006e3
 - name: pyopus
   repo: https://fides.fe.uni-lj.si/pyopus/download
   commit: '0.12'
