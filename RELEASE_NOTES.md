@@ -6,6 +6,7 @@ This document summarizes the most important changes of the individual releases o
 
 * [Adding] [`gdscheck`](https://github.com/aesc-silicon/gdscheck) `v0.1.2`, a standalone Rust DRC engine for GDSII
 * [Adding] FPGA place-and-route for Lattice ECP5 next to iCE40
+* [Adding] the 3.3 V high-voltage standard-cell libraries of both IHP PDKs, `sg13g2_stdcell_hv` and `sg13cmos5l_stdcell_hv`, 84 cells shipping with GDS, LEF, CDL, SPICE, Verilog, three Liberty corners, `xschem` symbols and a LibreLane configuration
 * [Adding] `sak-gds-xor.py`, which XORs two layouts (GDS2/OASIS) with KLayout
 * [Adding] `sak-open.py`, a launcher that scans a design tree and opens each design file in the matching tool
 * [Adding] `sak-render.py`, which renders a layout to PNG off-screen with the PDK's own KLayout colors
