@@ -6,11 +6,9 @@
 #######################################################################
 ARG BASE_IMAGE_BUILD=registry.iic.jku.at:5000/iic-osic-tools:base-dev
 FROM ${BASE_IMAGE_BUILD} AS yosys
-# Held back at v0.67: yosys v0.68 removed the "-fast" option from the "abc"
-# pass, but LibreLane calls "abc -fast" unconditionally in its pyosys
-# synthesis script, so every LibreLane flow dies in synthesis with v0.68.
-# Upstream LibreLane has no fix yet (main still calls it), so bump this back
-# to v0.68 (and eqy/sby/mcy with it) once it does.
+# Keep this pin in sync with the LibreLane version in install_eda.sh: yosys
+# v0.68 removed the "-fast" option from the "abc" pass, which LibreLane called
+# unconditionally up to 3.0.x, so an older LibreLane dies in synthesis here.
 ARG YOSYS_REPO_URL="https://github.com/YosysHQ/yosys.git"
 ARG YOSYS_REPO_COMMIT="v0.68"
 ARG YOSYS_NAME="yosys"

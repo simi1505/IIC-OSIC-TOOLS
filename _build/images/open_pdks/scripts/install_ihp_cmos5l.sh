@@ -108,20 +108,6 @@ else
 	echo "[WARN] KLayout netlist import templates not found at $TEMPLATES_FILE"
 fi
 
-# Make the PCell preprocessor temp file per-process. CMOS5L ships its own copy of
-# the PCell library __init__.py (it only symlinks pycell4klayout-api and
-# pypreprocessor into SG13G2), so install_ihp.sh's patch does not reach it.
-# Both PDKs use the same PCell module names, so without this two concurrent
-# KLayout processes delete each other's /tmp/<module>_pre.py and the loser
-# registers no PCells at all. Shared helper, same fix for both PDKs.
-echo "[INFO] Making the PCell preprocessor temp file per-process."
-PYCELL_INIT="$PDK_ROOT/$PDK/libs.tech/klayout/python/sg13cmos5l_pycell_lib/__init__.py"
-if [ -f "$PYCELL_INIT" ]; then
-	python3 "$PDK_SCRIPT_DIR/fix_pycell_tempfile.py" "$PYCELL_INIT"
-else
-	echo "[WARN] KLayout PCell library not found at $PYCELL_INIT"
-fi
-
 # Remove testing folders to save space
 echo "[INFO] Removing unnecessary files to save space."
 cd "$PDK_ROOT/$PDK"
@@ -304,6 +290,28 @@ else:
         f.write(tcl.replace(anchor, anchor + added, 1))
     print("[INFO] Added cornerDIO.lib and cornerPNP.lib to the corner list.")
 PYEOF
+
+# The xschem "Create FET .save file" menu entry and the matching launcher on the
+# xschem start page run "mkdir -p $netlist_dir" -- a shell command -- from Tcl.
+# Clicking either aborts with `invalid command name "mkdir"` and no .save file is
+# written. Tcl's own `file mkdir` is the exact equivalent: it creates parent
+# directories and does not complain about an existing one.
+# SG13G2 fixed this in the PDK (its libs.tech/xschem/xschem-menu and
+# start_page.sch already read `file mkdir`), CMOS5L still carries the shell
+# version. Drop this once it is fixed in
+# https://github.com/iic-jku/ihp-sg13cmos5l.
+echo "[INFO] Fixing the xschem 'Create FET .save file' entries."
+for xschem_file in xschem-menu start_page.sch; do
+	XSCHEM_FILE="$PDK_ROOT/$PDK/libs.tech/xschem/$xschem_file"
+	if [ ! -f "$XSCHEM_FILE" ]; then
+		echo "[WARN] xschem file not found at $XSCHEM_FILE"
+	elif grep -q '^[[:space:]]*mkdir -p \$netlist_dir[[:space:]]*$' "$XSCHEM_FILE"; then
+		sed -i 's/^\([[:space:]]*\)mkdir -p \$netlist_dir[[:space:]]*$/\1file mkdir $netlist_dir/' "$XSCHEM_FILE"
+		echo "[INFO] Replaced 'mkdir -p' by 'file mkdir' in $XSCHEM_FILE"
+	else
+		echo "[WARN] 'mkdir -p \$netlist_dir' not found in $XSCHEM_FILE (already fixed upstream?)"
+	fi
+done
 
 # Drop the backups the converter leaves behind: xschemrc.orig from its own
 # xschemrc patcher and *.sym.orig from xschem2vc's symbol patcher.

@@ -40,26 +40,17 @@ Note that up to image `2026.07` this was partly masked by a defect in the shippe
 
 Some pcell libraries were developed for older `gdsfactory` versions:
 
-- Skywater `sky130A`/`sky130B`: pcells were written against the `gdsfactory` 8.x APIs and private kfactory 0.17.x internals (`_get_default_kcl`, `_kdb_cell`, `Component.add_array`, implicit generic-PDK activation), which later `gdsfactory`/kfactory versions removed.
-- Global Foundries `gf180mcuC`/`gf180mcuD`: pcells rely on the implicit generic-PDK activation that `gdsfactory` removed in 9.29.0.
+- Skywater `sky130A`: pcells were written against the `gdsfactory` 8.x APIs and private kfactory 0.17.x internals (`_get_default_kcl`, `_kdb_cell`, `Component.add_array`, implicit generic-PDK activation), which later `gdsfactory`/kfactory versions removed.
+- Global Foundries `gf180mcuD`: pcells rely on the implicit generic-PDK activation that `gdsfactory` removed in 9.29.0.
 
 The image addresses these automatically (issue <https://github.com/iic-jku/IIC-OSIC-TOOLS/issues/162>): both pcell libraries are patched at PDK-install time so they work with the current system `gdsfactory` and need no dedicated virtual environment.
 
-Three further pcell defects are patched at PDK-install time as well, and the patches are removed once they are fixed upstream:
+Two further pcell defects are patched at PDK-install time as well, and the patches are removed once they are fixed upstream:
 
-- IHP `ihp-sg13g2`/`ihp-sg13cmos5l`: the pcell libraries preprocess every pcell module into `$TMPDIR/<module>_pre.py` and delete it again, using the bare module name. Both PDKs use the same module names, so two KLayout processes sharing `/tmp` deleted each other's file and the loser registered no pcell at all. The temp file now carries the process ID (issue <https://github.com/IHP-GmbH/IHP-Open-PDK/issues/1087>).
 - IHP `ihp-sg13g2`: `sealring` obtained the PDK version by running `git` inside the PDK tree, which is installed without its `.git`. It now reads the `COMMIT` file next to the PDK. `isolbox` defaulted its length and width below the minimum its own callback enforces, warning on every default instantiation.
 - Global Foundries `gf180mcuD`: the `efuse` pcell came out empty, because `draw_efuse()` was called without its required `device_name` argument and looked for its GDS in `~/.klayout/pymacros`, where nothing installs it.
 
 Regression test 27 (`_tests/27`) instantiates every pcell of every packaged PDK with its default parameters and pins the outcome, so a regression or an upstream fix is reported.
-
-### KLayout 0.30.10 Reports False DRC Violations in Deep Mode
-
-`KLayout` `0.30.10`, shipped with image `2026.08`, finds two-layer separation and enclosure violations in hierarchical (`deep`) mode that are not in the layout. On the stock `gf180mcuD` standard cell `gf180mcu_fd_sc_mcu7t5v0__dffrnq_1` it reports `DF.6_MV`, `PL.5a_MV` and `PL.5b_MV`; `0.30.9` reports none of them, and neither does `0.30.10` in flat mode. Rule deck and cell geometry are byte-identical between the two versions, so this is the tool and not the PDK.
-
-The visible consequence in this image is that regression test 04 (LibreLane with `gf180mcuD`) fails at `KLayout.DRC`. To tell a real violation from this one, rerun the deck with `-rd run_mode=flat`.
-
-Reported as [KLayout issue 2423](https://github.com/KLayout/klayout/issues/2423). It is not the already-fixed [issue 2416](https://github.com/KLayout/klayout/issues/2416): adding `.merged` to the first input of the affected rules does not change the result.
 
 ### The OpenROAD Flow Scripts (ORFS)
 
@@ -141,10 +132,6 @@ If you run *rootful* Podman with a non-root `CONTAINER_USER`, bind-mounts are mo
 Running Docker in rootless mode with X11/Wayland forwarding (`start_x.sh`) is not fully supported. The X11 and Wayland sockets are not accessible from the container due to UID/GID mismatches in the user namespace. There is no straightforward fix for Docker rootless mode.
 
 **Workaround:** Switch to [Podman](https://podman.io/) in rootless mode (see [Section 5.1 of the README](README.md#51-podman)). The start scripts automatically detect Podman rootless mode and add `--userns=keep-id`. On Fedora/RHEL also see the SELinux section above.
-
-### Palace EM-Setup
-
-Volker Muehlaus' `setupEM`/`gds2palace` tool for AWS Palace is only installed for `x86_64`, as there are currently issues with `gmsh` for `arm64` on Linux.
 
 ### GDS3D crashing on macOS
 

@@ -198,6 +198,20 @@ if [ -d "$PDK_ROOT/gf180mcuD" ]; then
 	# Fix missing PDK variant in path definitions for in xschemrc
 	sed -i 's|set 180MCU_MODELS ${PDK_ROOT}/models/ngspice|set 180MCU_MODELS ${PDK_ROOT}/gf180mcuD/libs.tech/ngspice|' "$PDK_ROOT/gf180mcuD/libs.tech/xschem/xschemrc"
 
+	# The xschem "Create FET .save file" menu entry runs "mkdir -p $netlist_dir"
+	# -- a shell command -- from Tcl, so clicking it aborts with
+	# `invalid command name "mkdir"` and no .save file is written. Tcl's own
+	# `file mkdir` is the exact equivalent: it creates parent directories and
+	# does not complain about an existing one. Same defect as in the IHP CMOS5L
+	# PDK, see install_ihp_cmos5l.sh.
+	XSCHEM_MENU="$PDK_ROOT/gf180mcuD/libs.tech/xschem/xschem-menu"
+	if grep -q '^[[:space:]]*mkdir -p \$netlist_dir[[:space:]]*$' "$XSCHEM_MENU"; then
+		sed -i 's/^\([[:space:]]*\)mkdir -p \$netlist_dir[[:space:]]*$/\1file mkdir $netlist_dir/' "$XSCHEM_MENU"
+		echo "[INFO] Replaced 'mkdir -p' by 'file mkdir' in $XSCHEM_MENU"
+	else
+		echo "[WARN] 'mkdir -p \$netlist_dir' not found in $XSCHEM_MENU (already fixed upstream?)"
+	fi
+
 	# Fix incorrect sky130 model reference in gf180mcuD xschem transistor symbols.
 	# The OP annotation tcleval expressions incorrectly use msky130_fd_pr__@model
 	# instead of m0 (the actual internal MOSFET element name in gf180mcu subcircuits).
