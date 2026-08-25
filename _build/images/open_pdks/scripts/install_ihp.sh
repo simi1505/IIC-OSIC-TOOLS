@@ -82,20 +82,6 @@ else
     echo "[WARN] KLayout netlist import templates not found at $TEMPLATES_FILE"
 fi
 
-# The PCell library preprocesses every PCell module into /tmp/<module>_pre.py and
-# deletes it again. The name carries no process identity and both IHP PDKs use
-# the same module names, so two KLayout processes clobber each other's file and
-# the loser fails to register the library at all (0 PCells). CMOS5L ships its own
-# copy of __init__.py, so the fix lives in a shared helper that
-# install_ihp_cmos5l.sh runs as well.
-echo "[INFO] Making the PCell preprocessor temp file per-process."
-PYCELL_INIT="$PDK_ROOT/$PDK/libs.tech/klayout/python/sg13g2_pycell_lib/__init__.py"
-if [ -f "$PYCELL_INIT" ]; then
-    python3 "$PDK_SCRIPT_DIR/fix_pycell_tempfile.py" "$PYCELL_INIT"
-else
-    echo "[WARN] KLayout PCell library not found at $PYCELL_INIT"
-fi
-
 # The IHP PDK renamed the IO netlist to libs.ref/sg13g2_io/spice/sg13g2_io.spice,
 # but several consumers still expect the old name sg13g2_io.spi:
 #   - libs.tech/librelane/config.tcl (PAD_SPICE_MODELS)
@@ -261,39 +247,6 @@ if [ -d "$CNI_DIR" ]; then
     done
 else
     echo "[WARN] CNI shape classes not found at $CNI_DIR"
-fi
-
-# KLayout 0.30.10 no longer merges the first input of a two-layer DRC check.
-# The NBL rules pass the net-annotated nBuLay region unmerged, so edges that are
-# interior to the nBuLay area become visible to the check and get measured
-# against the second layer, which reports separations that do not exist. A
-# DRC-clean sg13_dnwell_inv (from iic-jku/open-pdks-regression-tests) fails with
-# 2x NBL.e and 1x NBL.f under 0.30.10 and is clean again with the merge back.
-# All three nbl_nets checks are the same construct; NBL.d is patched along with
-# the two that are known to misfire, since it is exposed in exactly the same way.
-# Remove this once https://github.com/KLayout/klayout/issues/2416 is resolved.
-echo "[INFO] Fixing the nBuLay DRC rules for KLayout >= 0.30.10."
-NBULAY_DRC="$PDK_ROOT/$PDK/libs.tech/klayout/tech/drc/rule_decks/feol/5_3_nbulay.drc"
-if [ -f "$NBULAY_DRC" ]; then
-    python3 - "$NBULAY_DRC" << 'PYEOF'
-import sys
-
-fname = sys.argv[1]
-with open(fname, 'r') as f:
-    content = f.read()
-
-# Naturally idempotent: the patched call no longer contains the searched text.
-count = content.count('nbl_nets.sep(')
-if count:
-    content = content.replace('nbl_nets.sep(', 'nbl_nets.merged.sep(')
-    with open(fname, 'w') as f:
-        f.write(content)
-    print("[INFO] Merged the first input of %d nBuLay check(s) in %s" % (count, fname))
-else:
-    print("[WARN] nBuLay checks not patched in %s (already fixed upstream?)" % fname)
-PYEOF
-else
-    echo "[WARN] nBuLay DRC rule deck not found at $NBULAY_DRC"
 fi
 
 # The parallel-simulation launchers in the xschem test schematics call
