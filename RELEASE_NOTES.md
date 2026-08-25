@@ -4,60 +4,33 @@ This document summarizes the most important changes of the individual releases o
 
 ## 2026.08
 
-* [Adding] [`gdscheck`](https://github.com/aesc-silicon/gdscheck) `v0.1.2`, a standalone Rust DRC engine for GDSII: YAML rule decks, parallel checks, KLayout-compatible `.lyrdb` output, and built-in decks for IHP `SG13G2`/`SG13CMOS5L`. Upstream calls it experimental, so cross-check against Magic or KLayout before signoff.
-* [Adding] FPGA place-and-route for Lattice ECP5 next to iCE40: `nextpnr` is built for both, and [`prjtrellis`](https://github.com/YosysHQ/prjtrellis) supplies `ecppack` and the ECP5 database (about 95 MB). This completes the in-container ULX3S flow of the AMS template; programming the board stays on the host. New test 33.
-* [Adding] `sak-gds-xor.py`, which XORs two layouts (GDS2/OASIS) with KLayout and writes out the differing geometry.
-* [Adding] `sak-open.py`, a launcher that scans a design tree and opens each design file in the matching tool (`xschem`, KLayout, Magic, GTKWave, `gaw`, editor) in its own directory.
-* [Adding] `sak-render.py`, which renders a layout to PNG off-screen with the PDK's own KLayout colors, cropped to the geometry, for all four packaged technologies.
-* [Adding] the `unifont` package, so unicode symbols in schematics, netlists and terminal output render instead of boxes.
-* [Adding] a complete logo asset pack in `_logo/` (PNG and SVG, color/mono/reversed, horizontal and stacked).
-* [Update] VACASK support for IHP `SG13CMOS5L` is complete and now uses upstream's own `sg13cmos5ltovc.py` ([VACASK issue #94](https://codeberg.org/arpadbuermen/VACASK/issues/94)), which also converts CMOS5L's standard-cell and I/O netlists. Three defects were fixed upstream, so no local fixups remain.
-* [Update] `xschem` and `LibMan` bumped past the upstream fixes for the headless `tcleval` focus call ([xschem issue #494](https://github.com/StefanSchippers/xschem/issues/494)) and the Qt6 build ([LibMan issue #5](https://github.com/IHP-GmbH/LibMan/issues/5)); both local patches are removed again.
-* [Update] the Yosys stack (`yosys`, `eqy`, `sby`, `mcy`) to `v0.68` together with `librelane` `3.1.0.dev3`; `v0.68` removed the `abc -fast` option that older LibreLane called unconditionally, so both have to move together.
-* [Update] `KLayout` to `v0.30.11`, which fixes two deep-mode DRC regressions of `0.30.10` that reported separations and enclosures which are not in the layout ([issue 2416](https://github.com/KLayout/klayout/issues/2416), [issue 2423](https://github.com/KLayout/klayout/issues/2423)): `NBL.e`/`NBL.f` on a DRC-clean IHP `sg13_dnwell_inv`, and `DF.6_MV`/`PL.5a_MV`/`PL.5b_MV` on a stock `gf180mcuD` standard cell, which is what failed test 04. The local `nBuLay` rule-deck workaround is removed again.
-* [Update] various tool and Python package version bumps: `bender`, `gdsfactory`, `ghdl`, `gtkwave`, `iverilog`, Kactus2 (`v3.14.1`), `kepler-formal`, KLayout (`v0.30.11`), `klayout-pex`, Magic (`8.3.681`), `najaeda`, `nextpnr`, `ngspice` (`ngspice-47`), `nvc` (`r1.22.1`), `open_pdks`, `openEMS`, `openvaf`, OpenROAD, `palace`, the RISC-V GNU toolchain, `scikit-rf`, `setupEM`/`gds2palace`, SiliconCompiler, `slang` and the `slang-yosys-plugin`, `snp2le`, `spicebind`, `spike`, `surelog` (`v1.87`), `sv2v`, `uv` (`0.12.5`), VACASK, `verible`, and `xschem`.
-* [Changing] the browser session serves the full noVNC client from upstream `v1.7.0` instead of the `vnc_lite.html` demo page from Ubuntu's `1.3.0`: clipboard transfer in both directions, fullscreen, ctrl-alt-del, and a desktop that resizes to the browser window. The advertised URL is unchanged, and the connection target is pinned to the address the page was loaded from.
-* [Changing] the branding is refreshed with the new logo (`README`, noVNC favicon and tab title, JupyterLab favicons, desktop background, now scaled instead of centered); the `#22272E` backdrop color finally applies.
-* [Changing] the desktop terminal is `xfce4-terminal` instead of `gnome-terminal`, whose D-Bus factory frequently failed to map a window in the container. `xterm` stays, since `xschem` spawns it for simulations.
-* [Changing] double-clicking a file in Thunar (or `xdg-open`) opens the matching tool: a system-wide `mimeapps.list` routes schematics, layouts, `.mag`, `.cdl`, netlists, waveforms and Makefiles to their viewers, with desktop entries for GTKWave and `gaw` and an own MIME type for ngspice `.raw`. New test 30 checks the extension → MIME type → application chain.
-* [Changing] `xschem` requires the Ctrl key to zoom and pan inside graph (waveform) widgets (`graph_use_ctrl_key`), set system-wide; the `Options` toggle still switches it back per session.
-* [Changing] `Veryl` works out of the box: `verylup setup` runs at build time, so `veryl` and `veryl-ls` are on `PATH`. It previously failed for non-root users with `EPERM`.
-* [Changing] the container startup was audited across all three operating modes: `DISPLAY` defaults per host OS instead of a dead `:0`, the VNC session no longer starts `ssh-agent`, `gpg-agent`, `xiccd` and the `udisks2` volume monitor, `~/.Xauthority` is pre-created, the X11-mode terminal runs under `dbus-run-session`, and harmless noVNC/GTK/dbus messages are filtered from the log.
-* [Changing] `PyOPUS` is ported from PyQt5 to PySide6; the `pyog` project GUI is removed, as it relies on PyQt5-specific dispatch.
-* [Changing] the Liberty files in `libs.ref` of all packaged PDKs also ship gzipped as `.lib.gz`, which the PDK flow configurations reference and every Liberty-reading tool handles. **Deprecation notice:** the uncompressed `.lib` files are kept for the next few releases and will then be removed, so please migrate your own flows.
-* [Fix] `librelane` could not read those gzipped Liberty files in `Toolbox.get_lib_voltage()`, so `OpenROAD.IRDropReport`, the last step of the `Classic` flow, aborted with a syntax error. The image patches that function to decompress first ([librelane issue #627](https://github.com/librelane/librelane/issues/627)).
-* [Fix] the PDK operating-point annotation symbols (`annotate_fet_params.sym`, `annotate_bip_params.sym`) showed `NaN` in every field in `2026.07`; `xschem` is bumped past the upstream fix ([issue #342](https://github.com/iic-jku/IIC-OSIC-TOOLS/issues/342), [xschem issue #460](https://codeberg.org/stef_xschem/xschem/issues/460)).
-* [Fix] `xschem` no longer asks whether embedded Tcl scripts may be executed, which the PDK launcher symbols and `tcleval()` attributes need: `xschem_execute_scripts yes` moved to the system-wide `xschemrc`, since the user file is skipped whenever the working directory has an `xschemrc` of its own, as every IIC design template does.
-* [Fix] `start_vnc.sh` detects rootless Podman on macOS and Windows too, where host ports below 1024 are refused, so `WEBSERVER_PORT` now falls back to `8080` there as well. A failed start reports the error and exits non-zero instead of printing the VNC URL.
-* [Fix] the start scripts no longer prefix `DOCKER_REGISTRY` when `DOCKER_USER` already names a registry (contains a `.` or `:`, or is `localhost`), which made private registries unusable since `2026.07`. `DOCKER_REGISTRY=none` is now available in the `.bat` scripts too, and an empty `DOCKER_USER` means the root of the registry.
-* [Fix] a mouse button could get stuck down in the browser session, after which X's implicit pointer grab misrouted every later click. Fixed upstream in noVNC `1.6.0`; native VNC viewers were never affected.
-* [Fix] forcing VNC mode with `-V`/`--vnc` killed the container, because that flag skips the UI auto-detection that set `DISPLAY`. `DISPLAY` now defaults to `:1` whenever the VNC session starts without one.
-* [Fix] the browser no longer serves a stale noVNC client after an image upgrade; every `websockify` response now carries `Cache-Control: no-cache`. **Note:** a browser that already cached the old client needs one reload bypassing the cache (`Ctrl+Shift+R`, `Cmd+Shift+R` on macOS).
-* [Fix] the `[INFO] noVNC HTML client started` line and the `README` instructions omitted the web server port, which misleads whenever `WEBSERVER_PORT` is not `80`.
-* [Fix] `XDG_RUNTIME_DIR` is created per user as `/tmp/runtime-<uid>` with mode `0700` instead of a root-owned, world-writable shared directory. An externally provided value (WSLg's, for example) is respected, `CONTAINER_XDG_RUNTIME_DIR` still overrides, and a forwarded Wayland socket is mounted at `/tmp/host-wayland`.
-* [Fix] `PySide6` was left broken by the removal of `PySide6-Addons`, which deleted shared top-level files that Essentials still needs, breaking matplotlib's Qt backend and every GUI on top of it. Essentials is now force-reinstalled.
-* [Fix] `charlib` and `cir2py` are installed as wrappers that unset `PYTHONPATH` before launching their venv entry points, so the container-wide Python path no longer shadows CharLib's pinned `PySpice` fork.
-* [Fix] the `feed` parameter of the IHP `SG13CMOS5L` `cap_cmomi` capacitor can be set again in VACASK, which had locked the device to `feed=double` and broke the `xschem` → VACASK path. Fixed in upstream's converter; new test 29 covers `cap_cmomi` in both simulators.
-* [Fix] the IHP `SG13CMOS5L` capacitor corners work in VACASK again: the converter's hardcoded device lists skipped the newly added `cap_cmomf`, so every deck pulling in `cornerCAP.lib` died on a missing include. The lists are now completed from the installed PDK tree, backed by two install-time checks (every include resolves, every OSDI object exists).
-* [Fix] the pcell inventory baselines of test 27 are updated for that PDK bump: `ihp-sg13g2` 37 → 38 pcells (`cap_cmomf`), `ihp-sg13cmos5l` 24 → 26 (`cap_cmomf`, `guard_ring`).
-* [Fix] selecting the PDK at container start (`-e PDK=<pdk>`) now also derives `STD_CELL_LIBRARY` and `GF_PDK_OPTION`, which were hardcoded to the IHP `SG13G2` cells and left unset for `gf180mcu`; an explicit value still wins.
-* [Fix] the KLayout PCell libraries of both IHP PDKs no longer break when two KLayout processes run at the same time: they preprocessed each PCell module to the same name in a shared `$TMPDIR`, and the loser then registered *no* PCell at all. Fixed upstream in both PDKs, which now preprocess into a per-process temporary directory ([IHP-Open-PDK issue 1087](https://github.com/IHP-GmbH/IHP-Open-PDK/issues/1087)); the local fixup is removed again.
-* [Fix] the `gf180mcuD` `efuse` PCell produces geometry instead of an empty cell (missing `device_name` argument and a wrong GDS path, both patched at PDK-install time).
-* [Fix] instantiating IHP PCells no longer floods the console: `sealring` no longer shells out to `git`, `isolbox`'s defaults match what its callback clamps to, and the `Box.destroy` warnings are verbosity-gated.
-* [Fix] `sak-pin-reorder.py` matches the `.subckt` card case-insensitively, so KLayout-PEX netlists (which write `.SUBCKT`) no longer fail.
-* [Fix] the container works on SELinux hosts (Fedora, RHEL and clones), where the bind-mounted GUI sockets and designs directory were denied. The start scripts now add `--security-opt label=disable` when SELinux is enabled; `IIC_OSIC_TOOLS_SELINUX_LABEL` selects another option or, exported empty, switches it off ([issue #352](https://github.com/iic-jku/IIC-OSIC-TOOLS/issues/352), README section 5.1.1). An existing container has to be re-created.
-* [Fix] a container that dies during startup no longer fails silently: the start scripts print the tail of its log with a hint and no longer advertise a VNC or Jupyter URL for a container that already exited (`IIC_OSIC_TOOLS_NO_STARTUP_CHECK` skips the wait). Inside, an unreachable X server is reported with display, authority file and likely causes.
-* [Fix] `install.sh` records the chosen container engine in `$HOME/.config/iic-osic-tools/env`, which the start scripts source, so a leftover `docker` CLI no longer wins over Podman. A value set in the environment still wins.
-* [Fix] the `xschem` menus and launchers of `gf180mcuD`, `ihp-sg13g2` and `ihp-sg13cmos5l` called shell commands (`mkdir -p`, `python3`) from Tcl, so "Create FET .save file" and the SimulatePARALLEL launchers died with `invalid command name` whenever `xschem` was started detached. Patched at PDK-install time.
-* [Fix] VACASK aborted on host kernels older than 5.3 (RHEL/Rocky/Alma 8) for every deck with a `postprocess(PYTHON, ...)`; Boost and VACASK are now built without `pidfd_open`.
-* [Build] the build-only compiler toolchains (`clang`/LLVM, `gnat`, `gfortran`) move to `base-dev` and the unused `ant` and `binutils-gold` are dropped, saving about 300 MB.
-* [Build] the Python Qt bindings are consolidated on `PySide6`, saving about 115 MB. Both Qt runtimes stay: OpenROAD's GUI is Qt5-only, KLayout, Kactus2 and Qucs-S are Qt6.
-* [Build] no `pip` download cache reaches the image anymore (`PIP_NO_CACHE_DIR`, about 55 MB), and the leftover `rustup` directory is cleaned up at the end of the EDA install.
-* [Build] every `FIXME` in the build scripts and the ORFS test is resolved; the remaining workarounds now fail loudly when upstream moves.
-* [Build] the Python regression tests are extended (`PySide6` version and on-disk completeness, `chipify`/`snp2le` Qt entry points, the `PySpice` API CharLib uses and its wrapper script).
-* [Build] the LibreLane smoke tests (01, 04, 07, 18) now check the exit code, both logs and `final/metrics.json`, so a flow that crashes without printing `ERROR` can no longer pass.
-* [Docs] normalized the project name to `IIC-OSIC-TOOLS` throughout the documentation and the install scripts.
-* [Docs] the "Overwriting Shell Variables" examples in `README.md` set `DOCKER_USER` instead of the `DOCKER_USERNAME` no script reads.
+* [Adding] [`gdscheck`](https://github.com/aesc-silicon/gdscheck) `v0.1.2`, a standalone Rust DRC engine for GDSII
+* [Adding] FPGA place-and-route for Lattice ECP5 next to iCE40
+* [Adding] `sak-gds-xor.py`, which XORs two layouts (GDS2/OASIS) with KLayout
+* [Adding] `sak-open.py`, a launcher that scans a design tree and opens each design file in the matching tool
+* [Adding] `sak-render.py`, which renders a layout to PNG off-screen with the PDK's own KLayout colors
+* [Adding] the `unifont` package
+* [Adding] a complete logo asset pack in `_logo/`
+* [Update] various tool and Python package version bumps
+* [Changing] the browser session serves the full noVNC client from upstream `v1.7.0` instead of the `vnc_lite.html` demo page from Ubuntu's `1.3.0`
+* [Changing] the branding is refreshed with the new logo
+* [Changing] the desktop terminal is `xfce4-terminal` instead of `gnome-terminal`
+* [Changing] double-clicking a file in Thunar (or `xdg-open`) opens the matching tool
+* [Changing] `xschem` requires the Ctrl key to zoom and pan inside graph (waveform) widgets (`graph_use_ctrl_key`), set system-wide
+* [Changing] the Liberty files in `libs.ref` of all packaged PDKs also ship gzipped as `.lib.gz`, which the PDK flow configurations reference and every Liberty-reading tool handles. **Deprecation notice:** the uncompressed `.lib` files are kept for the next few releases and will then be removed, so please migrate your own flows!
+* [Fix] `xschem` no longer asks whether embedded Tcl scripts may be executed, which the PDK launcher symbols and `tcleval()` attributes need: `xschem_execute_scripts yes` moved to the system-wide `xschemrc`
+* [Fix] `start_vnc.sh` detects rootless Podman on macOS and Windows too
+* [Fix] the start scripts no longer prefix `DOCKER_REGISTRY` when `DOCKER_USER` already names a registry
+* [Fix] forcing VNC mode with `-V`/`--vnc` killed the container, because that flag skips the UI auto-detection that set `DISPLAY`
+* [Fix] the browser no longer serves a stale noVNC client after an image upgrade
+* [Fix] the `[INFO] noVNC HTML client started` line and the `README` instructions omitted the web server port
+* [Fix] `XDG_RUNTIME_DIR` is created per user as `/tmp/runtime-<uid>` with mode `0700` instead of a root-owned, world-writable shared directory
+* [Fix] `PySide6` was left broken by the removal of `PySide6-Addons`
+* [Fix] selecting the PDK at container start (`-e PDK=<pdk>`) now also derives `STD_CELL_LIBRARY` and `GF_PDK_OPTION`
+* [Fix] `sak-pin-reorder.py` matches the `.subckt` card case-insensitively
+* [Fix] the container works on SELinux hosts (Fedora, RHEL and clones), where the bind-mounted GUI sockets and designs directory were denied. The start scripts now add `--security-opt label=disable` when SELinux is enabled
+* [Fix] a container that dies during startup no longer fails silently
+* [Fix] `install.sh` records the chosen container engine in `$HOME/.config/iic-osic-tools/env`, which the start scripts source
 
 ## 2026.07
 
