@@ -15,7 +15,7 @@
   commit: dc6d965225c9f5ed2a6faefb7ea30665429060fe
 - name: ghdl
   repo: https://github.com/ghdl/ghdl.git
-  commit: 753dfcf0b8d87f6aa8929efd0b73a9e57e105b63
+  commit: d71175c7c983b3a851acfa3be0d493e95e3dafba
 - name: ghdl-yosys-plugin
   repo: https://github.com/ghdl/ghdl-yosys-plugin.git
   commit: a45a8fbf19827cd9c4780b00cec9781ef9961293
@@ -39,7 +39,7 @@
   commit: a1a56e944140b9303b169eabd191ec9c92a4af7a
 - name: klayout
   repo: https://github.com/KLayout/klayout.git
-  commit: v0.30.10
+  commit: v0.30.11
 - name: libman
   repo: https://github.com/IHP-GmbH/LibMan.git
   commit: 84c5974a647c5d7d5a9ddc3bae7b6396e008ce33
@@ -69,7 +69,7 @@
   commit: 84703e254dafe84ed2f06056e5f105067b8f1910
 - name: openroad
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
-  commit: d9e7a4be7c605c11d5cc4bbed6ea144fd0b76726
+  commit: 21512b0ab68cc3bc7e11a772e1ec32f6f90e0eec
 - name: openroad-librelane
   repo: https://github.com/The-OpenROAD-Project/OpenROAD.git
   commit: dcf36133a369abc8f3c5e5738cd4d82e4903c0e0
@@ -84,7 +84,7 @@
   commit: 17fba2638142baa4dc6e2a0b18cb1cd542017e16
 - name: palace
   repo: https://github.com/awslabs/palace.git
-  commit: 86810b1909f3e05e0bf1fd78f485e59d55582b6d
+  commit: 71cf12c267ece4e875bd4e1ad4f9fae85f83b709
 - name: prjtrellis
   repo: https://github.com/YosysHQ/prjtrellis.git
   commit: 3afe7b52b30f4b4417ee98f03016767a502006e3
@@ -120,7 +120,7 @@
   commit: 382f58f1824105f6341825b863ee3c6ae07b3e38
 - name: spike
   repo: https://github.com/riscv-software-src/riscv-isa-sim.git
-  commit: 231e0d535d371eed4a7f5781d82ea0a8b96bdae2
+  commit: 793f80cf78c74aa845853bcd11c94681c4fd6564
 - name: surelog
   repo: https://github.com/chipsalliance/Surelog.git
   commit: v1.87
@@ -138,7 +138,7 @@
   commit: 0.12.5
 - name: vacask
   repo: https://codeberg.org/arpadbuermen/VACASK.git
-  commit: bf59752fbfdfed18dc7fe2e3e11a9c02f8de28a0
+  commit: a9d8860929517499299b91a0300c0f8ff2ff4716
 - name: verilator
   repo: https://github.com/verilator/verilator.git
   commit: v5.050
@@ -150,7 +150,7 @@
   commit: 9051f4804fe8f6386272085f604c9238e5ac0b05
 - name: xschem
   repo: https://github.com/StefanSchippers/xschem.git
-  commit: 64bb8f9f8dd4560effc93f2a9a756ba06ebbdc00
+  commit: 219167e2a6eddfbed510be8b4ca93f9f53766896
 - name: xyce
   repo: https://github.com/Xyce/Xyce.git
   commit: Release-7.10.0
