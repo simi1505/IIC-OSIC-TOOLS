@@ -74,15 +74,23 @@ with open(sys.argv[2], "w") as f:
     f.write(body)
 PYEOF
 
-# Reproduces the patched resolution with the surrounding variables stubbed, run
-# from a working directory that has nothing to do with the layout.
+# Reproduces the patched DRC resolution with the surrounding variables stubbed,
+# run from a working directory that has nothing to do with the layout.
 cat > "$WORKDIR/resolve.rb" << 'RBEOF'
-run_dir = ARGV[0]
+opt = ARGV[0]
 gds_path = ARGV[1]
 top_cell = ARGV[2]
 run_dir_base = gds_path.to_s.empty? ? Dir.pwd : File.dirname(File.expand_path(gds_path.to_s))
-run_dir = run_dir.gsub('%top_cell%', top_cell.to_s.gsub(/[^A-Za-z0-9_.-]/, '_'))
-puts File.expand_path(run_dir, run_dir_base)
+safe_top = top_cell.to_s.gsub(/[^A-Za-z0-9_.-]/, '_')
+run_dir = opt
+if run_dir.nil? || run_dir.strip.empty?
+  if File.directory?(File.expand_path('../verification', run_dir_base))
+    run_dir = "../verification/drc/#{safe_top}.klayout-gui.drc"
+  else
+    run_dir = "drc_run_#{top_cell}"
+  end
+end
+puts File.expand_path(run_dir.gsub('%top_cell%', safe_top), run_dir_base)
 RBEOF
 
 for PDK in ihp-sg13g2 ihp-sg13cmos5l; do
@@ -102,6 +110,12 @@ for PDK in ihp-sg13g2 ihp-sg13cmos5l; do
         # the one-argument form is what resolved against the working directory
         check "$PDK: ${KIND}.lym has no cwd-relative expand_path" 1 \
             grep -qE "File\.expand_path\(run_dir\)" "$LYM"
+        check "$PDK: ${KIND}.lym defaults into a sibling verification folder" 0 \
+            grep -q "File.directory?(File.expand_path('../verification', run_dir_base))" "$LYM"
+        # a menu run must never land on the batch <cell>.klayout.<kind> that
+        # sak-drc.sh and sak-lvs.sh write, the DRC macro deletes its run dir
+        check "$PDK: ${KIND}.lym tags the default so it cannot hit the batch run" 0 \
+            grep -q "klayout-gui.${KIND}" "$LYM"
 
         OPT=$MACROS/${PREFIX}_${KIND}_options.lym
         check "$PDK: ${KIND} options document %top_cell%" 0 \
@@ -142,12 +156,29 @@ expect "relative run_dir follows the layout, not the cwd" \
     "../verification/drc/%top_cell%.klayout.drc" "/p/layout/inv.gds" "inv"
 expect "absolute run_dir is left alone" \
     "/tmp/fixed" "/tmp/fixed" "/p/layout/inv.gds" "inv"
-expect "default run_dir lands next to the layout" \
+expect "an explicit relative run_dir lands next to the layout" \
     "/p/layout/drc_run_inv" "drc_run_inv" "/p/layout/inv.gds" "inv"
 expect "no layout falls back to the cwd" \
     "$WORKDIR/elsewhere/out" "out" "" "inv"
 expect "a cell name is sanitized into one path component" \
     "/p/layout/v/a_b" "v/%top_cell%" "/p/layout/inv.gds" "a/b"
+
+# The default follows the project: a verification folder beside the layout
+# folder takes the reports, anything else keeps them next to the layout.
+PROJ=$WORKDIR/proj
+mkdir -p "$PROJ/layout" "$PROJ/verification" "$PROJ/final/gds"
+: > "$PROJ/layout/inv.gds"
+: > "$PROJ/final/gds/inv.gds"
+
+expect "empty run_dir uses the sibling verification folder" \
+    "$PROJ/verification/drc/inv.klayout-gui.drc" "" "$PROJ/layout/inv.gds" "inv"
+expect "empty run_dir stays next to a layout with no verification sibling" \
+    "$PROJ/final/gds/drc_run_inv" "" "$PROJ/final/gds/inv.gds" "inv"
+expect "the default never lands on the batch <cell>.klayout.drc" \
+    "$PROJ/verification/drc/inv.klayout-gui.drc" "" "$PROJ/layout/inv.gds" "inv"
+expect "an explicit setting still overrides the project default" \
+    "$PROJ/verification/drc/inv.klayout.drc" \
+    "../verification/drc/%top_cell%.klayout.drc" "$PROJ/layout/inv.gds" "inv"
 
 if [ "$FAIL" -ne 0 ]; then
     echo "[ERROR] Test <KLayout GUI run directory> FAILED! $PASS passed, $FAIL failed. Check the log file $LOG for details."

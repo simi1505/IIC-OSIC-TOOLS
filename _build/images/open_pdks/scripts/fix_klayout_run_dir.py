@@ -13,24 +13,37 @@ writes its reports to a different place depending on how KLayout was started,
 and the reports land next to the GDS instead of in the project's verification
 folder.
 
-Two changes per macro fix that:
+Three changes per macro fix that:
 
 1. A relative ``run_dir`` is resolved against the directory of the active layout
    file, so the result no longer depends on the working directory. Absolute
-   values and ``~`` keep working unchanged, and so does the default when the
-   option is left empty (it just becomes deterministic).
+   values and ``~`` keep working unchanged.
 2. ``%top_cell%`` in ``run_dir`` is replaced by the name of the cell being run,
    sanitized for use as a path component. Without it the option is a fixed
    string, so every cell of a project shares one directory - which the DRC macro
    then deletes before each run.
+3. The default, when the option is left empty, follows the project instead of
+   the layout folder: a layout whose directory has a ``verification`` folder
+   beside it reports into
 
-Together they make a single setting such as
+       ../verification/drc/<cell>.klayout-gui.drc
+       ../verification/lvs/<cell>.klayout-gui.lvs
+
+   and every other layout keeps the upstream default next to itself
+   (``drc_run_<cell>``, ``lvs_run_<cell>_<timestamp>``). This is what makes the
+   reports land in the project's verification folder with nothing to configure.
+
+The ``klayout-gui`` tag is not decoration. The batch scripts write
+``<cell>.klayout.drc`` and ``<cell>.klayout.lvs`` into the same folder, those
+reports are committed in the IIC design templates, and the DRC macro deletes its
+run directory before every run. A shared name would let one menu click destroy a
+signoff result, so the two never share a directory.
+
+Setting the option explicitly still overrides all of it, and
 
     ../verification/drc/%top_cell%.klayout.drc
-    ../verification/lvs/%top_cell%.klayout.lvs
 
-place the GUI results where sak-drc.sh and sak-lvs.sh already put the batch
-ones, for every cell and from any working directory.
+is the way to say "put the menu runs exactly where the batch ones go".
 
 The matching option dialogs get their placeholder and tooltip updated, so the
 new semantics are visible where the value is typed.
@@ -57,15 +70,22 @@ PATCHES = (
         '  run_dir = "drc_run_#{top_cell}"\n'
         'end\n'
         'run_dir = File.expand_path(run_dir)\n',
-        'run_dir = options[\'run_dir\']\n'
-        'if run_dir.nil? || run_dir.strip.empty?\n'
-        '  run_dir = "drc_run_#{top_cell}"\n'
-        'end\n'
         '# A relative run_dir is resolved against the layout file, not against the\n'
         '# working directory KLayout was started in, and %top_cell% names the cell.\n'
         'run_dir_base = gds_path.to_s.empty? ? Dir.pwd : File.dirname(File.expand_path(gds_path.to_s))\n'
-        'run_dir = run_dir.gsub(\'%top_cell%\', top_cell.to_s.gsub(/[^A-Za-z0-9_.-]/, \'_\'))\n'
-        'run_dir = File.expand_path(run_dir, run_dir_base)\n',
+        'safe_top = top_cell.to_s.gsub(/[^A-Za-z0-9_.-]/, \'_\')\n'
+        'run_dir = options[\'run_dir\']\n'
+        'if run_dir.nil? || run_dir.strip.empty?\n'
+        '  # A project that keeps a verification folder next to its layouts gets its\n'
+        '  # reports there. The klayout-gui tag keeps a menu run out of the batch\n'
+        '  # .klayout.drc directory, which this macro would delete before running.\n'
+        '  if File.directory?(File.expand_path(\'../verification\', run_dir_base))\n'
+        '    run_dir = "../verification/drc/#{safe_top}.klayout-gui.drc"\n'
+        '  else\n'
+        '    run_dir = "drc_run_#{top_cell}"\n'
+        '  end\n'
+        'end\n'
+        'run_dir = File.expand_path(run_dir.gsub(\'%top_cell%\', safe_top), run_dir_base)\n',
     ),
     (
         "*_lvs.lym",
@@ -85,8 +105,15 @@ PATCHES = (
         'run_dir_base = layout_path.to_s.empty? ? Dir.pwd : File.dirname(File.expand_path(layout_path.to_s))\n'
         'safe_top = top_cell.to_s.strip.empty? ? \'TOP\' : top_cell.gsub(/[^A-Za-z0-9_.-]/, \'_\')\n'
         'if run_dir.empty?\n'
-        '  timestamp = Time.now.strftime(\'%Y_%m_%d_%H_%M_%S\')\n'
-        '  run_dir = File.expand_path("lvs_run_#{safe_top}_#{timestamp}", run_dir_base)\n'
+        '  # A project that keeps a verification folder next to its layouts gets its\n'
+        '  # artifacts there, under a klayout-gui tag that never collides with the\n'
+        '  # batch .klayout.lvs directory. Anything else keeps the timestamped run.\n'
+        '  if File.directory?(File.expand_path(\'../verification\', run_dir_base))\n'
+        '    run_dir = File.expand_path("../verification/lvs/#{safe_top}.klayout-gui.lvs", run_dir_base)\n'
+        '  else\n'
+        '    timestamp = Time.now.strftime(\'%Y_%m_%d_%H_%M_%S\')\n'
+        '    run_dir = File.expand_path("lvs_run_#{safe_top}_#{timestamp}", run_dir_base)\n'
+        '  end\n'
         'else\n'
         '  run_dir = File.expand_path(run_dir.gsub(\'%top_cell%\', safe_top), run_dir_base)\n'
         'end\n',
@@ -95,10 +122,14 @@ PATCHES = (
         "*_drc_options.lym",
         "DRC run directory hint",
         '    @dir_input.setPlaceholderText("Optional - default is ./drc_run_&lt;cell_name&gt;")\n',
-        '    @dir_input.setPlaceholderText("Optional - default is drc_run_&lt;cell_name&gt; next to the layout")\n'
+        '    @dir_input.setPlaceholderText("Optional - default is ../verification/drc, else drc_run_&lt;cell_name&gt;")\n'
         '    @dir_input.setToolTip("Absolute, or relative to the directory of the layout file. '
         '%top_cell% is replaced by the cell name, so a single setting serves every cell, '
-        'e.g. ../verification/drc/%top_cell%.klayout.drc")\n',
+        'e.g. ../verification/drc/%top_cell%.klayout.drc. '
+        'Left empty, a layout whose folder has a verification folder beside it reports into '
+        '../verification/drc/&lt;cell&gt;.klayout-gui.drc, which never overwrites the batch '
+        '&lt;cell&gt;.klayout.drc of sak-drc.sh. Every other layout reports into '
+        'drc_run_&lt;cell&gt; next to itself.")\n',
     ),
     (
         "*_lvs_options.lym",
@@ -109,8 +140,11 @@ PATCHES = (
         "    @widgets[:run_dir][:input].setToolTip(\n"
         "      'Output folder for LVS artifacts. Absolute, or relative to the directory of the '\\\n"
         "      'layout file. %top_cell% is replaced by the cell name, so a single setting serves '\\\n"
-        "      'every cell, e.g. ../verification/lvs/%top_cell%.klayout.lvs. Leave empty to '\\\n"
-        "      'auto-create a timestamped run directory next to the layout.'\n"
+        "      'every cell, e.g. ../verification/lvs/%top_cell%.klayout.lvs. Left empty, a layout '\\\n"
+        "      'whose folder has a verification folder beside it reports into '\\\n"
+        "      '../verification/lvs/&lt;cell&gt;.klayout-gui.lvs, which never collides with the batch '\\\n"
+        "      '&lt;cell&gt;.klayout.lvs of sak-lvs.sh. Every other layout gets a timestamped run '\\\n"
+        "      'directory next to itself.'\n"
         "    )\n",
     ),
 )
