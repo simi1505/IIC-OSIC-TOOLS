@@ -10,19 +10,19 @@ FROM ${BASE_IMAGE_BUILD} AS yosys
 # v0.68 removed the "-fast" option from the "abc" pass, which LibreLane called
 # unconditionally up to 3.0.x, so an older LibreLane dies in synthesis here.
 ARG YOSYS_REPO_URL="https://github.com/YosysHQ/yosys.git"
-ARG YOSYS_REPO_COMMIT="v0.68"
+ARG YOSYS_REPO_COMMIT="v0.70"
 ARG YOSYS_NAME="yosys"
 ARG YOSYS_EQY_REPO_URL="https://github.com/YosysHQ/eqy.git"
 ARG YOSYS_EQY_NAME="yosys-eqy"
-ARG YOSYS_EQY_REPO_COMMIT="v0.68"
+ARG YOSYS_EQY_REPO_COMMIT="v0.70"
 ARG YOSYS_SBY_REPO_URL="https://github.com/YosysHQ/sby.git"
 ARG YOSYS_SBY_NAME="yosys-sby"
-ARG YOSYS_SBY_REPO_COMMIT="v0.68"
+ARG YOSYS_SBY_REPO_COMMIT="v0.70"
 ARG YOSYS_MCY_REPO_URL="https://github.com/YosysHQ/mcy.git"
 ARG YOSYS_MCY_NAME="yosys-mcy"
-ARG YOSYS_MCY_REPO_COMMIT="v0.68"
+ARG YOSYS_MCY_REPO_COMMIT="v0.70"
 ARG YICES2_NAME="yices2"
 ARG YICES2_REPO_URL="https://github.com/SRI-CSL/yices2.git"
-ARG YICES2_REPO_COMMIT="05178c03ddf49c6bba63c5c7153774c11a5da12d"
+ARG YICES2_REPO_COMMIT="560f3b375840560a3decaa27c1d2f2e6503c0ab2"
 RUN --mount=type=bind,source=images/yosys,target=/images/yosys \
     bash /images/yosys/scripts/install.sh
