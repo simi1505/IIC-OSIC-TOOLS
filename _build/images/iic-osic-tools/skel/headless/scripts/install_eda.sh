@@ -54,35 +54,35 @@ pip3 install $PIP_FLAGS --ignore-installed \
 # WASM-based amaranth-yosys + wasmtime (~75 MB); amaranth uses the native
 # yosys from PATH instead
 pip3 install $PIP_FLAGS \
-	"amaranth==0.5.9" \
-	cace==2.11.0 \
-	chipify==0.2.2 \
-	ciel==2.6.1 \
-	cocotb==2.0.1 \
+	"amaranth==0.5.10" \
+	cace==2.13.0 \
+	chipify==0.2.3 \
+	ciel==3.2.0 \
+	cocotb==2.1.0 \
 	cocotbext-ams==0.1.0 \
 	edalize==0.6.8 \
 	fault-dft==0.9.4 \
-	fusesoc==2.4.6 \
-	gds2palace==0.4.0 \
-	gdsfactory==9.48.0 \
-	gdsfill==0.1.8 \
+	fusesoc==2.4.7 \
+	gds2palace==0.10.5 \
+	gdsfactory==9.51.0 \
+	gdsfill==0.1.11 \
 	gdspy==1.6.13 \
 	jsonschema2md==1.7.0 \
-	klayout-pex==0.3.15 \
+	klayout-pex==0.9.0 \
 	klayout-vector-file-export-cli==0.5 \
 	lctime==0.0.26 \
-	librelane==3.1.0.dev3 \
-	najaeda==0.7.20 \
+	librelane==3.1.0.dev6 \
+	najaeda==0.7.35 \
 	pygmid==1.2.12 \
 	pyrtl==1.0.3 \
-	pyuvm==4.0.1 \
+	pyuvm==5.0.0 \
 	pyverilog==1.3.0 \
 	"schemdraw[svgmath]==0.23" \
-	scikit-rf==2.1.0 \
-	setupEM==0.3.15 \
-	siliconcompiler==0.38.5 \
-	snp2le==0.1.8 \
-	spicelib==1.6.3 \
+	scikit-rf==2.2.0 \
+	setupEM==0.18.2 \
+	siliconcompiler==0.38.12 \
+	snp2le==0.1.20 \
+	spicelib==1.6.4 \
 	spyci==1.0.2
 
 # librelane's Toolbox.get_lib_voltage() is the only Liberty reader in the flow
@@ -152,8 +152,8 @@ rustup default stable
 # Pinned with the crate@version form rather than --version: cargo accepts that
 # flag only for a single crate, so a second one would break the invocation.
 cargo install \
-	gdscheck@0.1.2 \
-	gdsfill@0.1.8 \
+	gdscheck@0.2.1 \
+	gdsfill@0.1.11 \
 	--root "${TOOLS}"
 
 # The venvs use --system-site-packages so large dependencies already in the
