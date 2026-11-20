@@ -7,7 +7,7 @@
 ARG BASE_IMAGE_BUILD="registry.iic.jku.at:5000/iic-osic-tools:base-dev"
 FROM ${BASE_IMAGE_BUILD} AS openroad-librelane
 ARG OPENROAD_LIBRELANE_REPO_URL="https://github.com/The-OpenROAD-Project/OpenROAD.git"
-ARG OPENROAD_LIBRELANE_REPO_COMMIT="dcf36133a369abc8f3c5e5738cd4d82e4903c0e0"
+ARG OPENROAD_LIBRELANE_REPO_COMMIT="f11b4276ba2389e3c7ad9791d1c9518f12453769"
 ARG OPENROAD_LIBRELANE_NAME="openroad-librelane"
 RUN --mount=type=bind,source=images/openroad-librelane,target=/images/openroad-librelane \
     bash /images/openroad-librelane/scripts/install.sh
