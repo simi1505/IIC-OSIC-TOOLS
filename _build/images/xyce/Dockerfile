@@ -7,7 +7,7 @@
 ARG BASE_IMAGE_BUILD=registry.iic.jku.at:5000/iic-osic-tools:base-dev
 FROM ${BASE_IMAGE_BUILD} AS xyce
 ARG XYCE_TRILINOS_REPO_URL="https://github.com/trilinos/Trilinos.git"
-ARG XYCE_TRILINOS_REPO_COMMIT="trilinos-release-12-12-1"
+ARG XYCE_TRILINOS_REPO_COMMIT="trilinos-release-17-3-0"
 ARG XYCE_TRILINOS_NAME="trilinos"
 ARG XYCE_REPO_URL="https://github.com/Xyce/Xyce.git"
 ARG XYCE_REPO_COMMIT="Release-7.10.0"
